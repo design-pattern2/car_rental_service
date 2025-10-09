@@ -1,4 +1,4 @@
-package car_rental_service;
+package main;
 
 public class Main {
 
