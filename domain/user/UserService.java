@@ -27,7 +27,7 @@ public class UserService {
 
     public User signUp(String userId, String rawPassword, String name, String phoneNumber) {
         // 1. 비즈니스 규칙: ID 중복 확인
-        if (userRepository.findById(userId).isPresent()) {
+        if (userRepository.findByUserId(userId).isPresent()) {
             throw new IllegalArgumentException("이미 존재하는 사용자 ID입니다.");
         }
 
@@ -53,7 +53,7 @@ public class UserService {
     // =================================================================
     public Optional<User> login(String userId, String rawPassword) {
         // 1. 데이터 접근 위임: ID로 사용자 조회
-        Optional<User> userOpt = userRepository.findById(userId);
+        Optional<User> userOpt = userRepository.findByUserId(userId);
 
         if (userOpt.isEmpty()) {
             return Optional.empty(); // 사용자 없음
@@ -74,7 +74,7 @@ public class UserService {
     // =================================================================
     public Optional<User> getUserInfo(String userId) {
         // 데이터 접근 위임: Repository의 findById 메서드를 호출하여 User 객체 반환
-        return userRepository.findById(userId);
+        return userRepository.findByUserId(userId);
     }
 
     // =================================================================
@@ -82,7 +82,7 @@ public class UserService {
     // =================================================================
     public User updateUserInfo(String userId, String newName, String newPassword, String newPhoneNumber) {
         // 1. 데이터 접근 위임: 수정할 기존 사용자 정보 조회
-        User user = userRepository.findById(userId)
+        User user = userRepository.findByUserId(userId)
                 .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 사용자입니다."));
 
         if (userRepository.findByPhoneNumber(newPhoneNumber).isPresent()) {
@@ -113,7 +113,7 @@ public class UserService {
     // =================================================================
     public String findPasswordResetLink(String userId) {
         // ID 존재 여부 확인을 Repository에 위임
-        return userRepository.findById(userId)
+        return userRepository.findByUserId(userId)
                 .map(u -> "비밀번호 재설정 링크를 발송했습니다.")
                 .orElse("해당 ID로 등록된 정보가 없습니다.");
     }
@@ -134,7 +134,7 @@ public class UserService {
     // =================================================================
     public User upgradeGrade(String userId, int i) {
         // 1. 데이터 접근 위임: 사용자 조회
-        User user = userRepository.findById(userId)
+        User user = userRepository.findByUserId(userId)
                 .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 사용자입니다."));
 
         UserMembershipStrategy newStrategy = switch (i) {
@@ -149,6 +149,16 @@ public class UserService {
 
         // 3. 데이터 접근 위임: 변경된 User 객체를 저장 (DB 업데이트)
         return userRepository.save(user);
+    }
+    // =================================================================
+    // 8. 카드 등록: registerCard(userId, cardNumber)
+    // =================================================================
+    public User registerCard(String userId, String cardNumber) {
+        // 모든 비즈니스 규칙(유효성 검사, DB 업데이트)을 Repository에 위임합니다.
+        // 현재는 복잡한 도메인 로직이 없으므로 단순 위임합니다.
+
+        // 1. 사용자 존재 유무 확인 및 업데이트 로직을 Repository에 요청
+        return userRepository.registerCard(userId, cardNumber);
     }
 
     // =================================================================
