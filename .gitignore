@@ -1,0 +1,14 @@
+# 1. 환경 변수 파일
+.env
+
+# 2. 빌드 결과물 (Java)
+out/
+target/
+build/
+
+# 3. 로그 파일
+*.log
+
+# 4. OS 파일
+.DS_Store
+Thumbs.db
