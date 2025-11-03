@@ -57,11 +57,6 @@
 
 ## .env 설정
 
-1. DB 연결 URL (DB 이름은 'rentalsystem'으로 통일)
-2. 본인의 MySQL 사용자 이름
-3. 본인의 MySQL 비밀번호
-
-
     DB_URL=
     DB_USERNAME=
     DB_PASSWORD=
