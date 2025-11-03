@@ -1,6 +1,5 @@
 package db;
 
-import java.io.InputStream;
 import java.sql.*;
 import java.util.*;
 import java.util.regex.Matcher;
@@ -8,13 +7,13 @@ import java.util.regex.Pattern;
 
 /**
  * DB 연결 및 SQL 실행을 전담하는 헬퍼 클래스 (DB 관리자 담당)
- * 1. DB 연결 관리 (시스템 환경 변수 'env' 기반)
+ * 1. DB 연결 관리 (시스템 속성 'System.getProperty' 기반)
  * 2. 이름 기반 파라미터(:paramName)를 JDBC(? 기반)로 변환 및 실행
  * 3. 템플릿 메서드 제공 (execute, queryForObject, queryForList 등)
  */
 public class DBConnection {
 
-    // --- 1. DB 연결 설정 (환경 변수 사용) ---
+    // --- 1. DB 연결 설정 (시스템 속성 사용) ---
 
     private static final String DB_URL;
     private static final String DB_USERNAME;
@@ -22,16 +21,17 @@ public class DBConnection {
     private static final String DB_DRIVER;
 
     static {
-        // 1. 시스템 환경 변수(env)를 읽어옵니다.
-        DB_URL = System.getenv("DB_URL");
-        DB_USERNAME = System.getenv("DB_USERNAME");
-        DB_PASSWORD = System.getenv("DB_PASSWORD");
-        DB_DRIVER = "com.mysql.cj.jdbc.Driver"; // MySQL 드라이버
+        // ⭐️ EnvLoader가 로드한 시스템 속성(System.getProperty)에서 값을 읽어옵니다.
+        DB_URL = System.getProperty("DB_URL");
+        DB_USERNAME = System.getProperty("DB_USERNAME");
+        DB_PASSWORD = System.getProperty("DB_PASSWORD");
+        DB_DRIVER = "org.mariadb.jdbc.Driver";
 
         // 2. 환경 변수가 올바르게 설정되었는지 확인
         if (DB_URL == null || DB_USERNAME == null || DB_PASSWORD == null) {
-            System.err.println("FATAL ERROR: DB 환경 변수가 설정되지 않았습니다.");
-            System.err.println("필요한 환경 변수: DB_URL, DB_USERNAME, DB_PASSWORD");
+            // EnvLoader.load()가 main에서 호출되었더라도, 값이 없는 경우를 대비
+            System.err.println("FATAL ERROR: .env 파일에서 DB 환경 변수를 읽어오지 못했습니다. DB 연결을 중단합니다.");
+            System.err.println("필요한 키: DB_URL, DB_USERNAME, DB_PASSWORD");
             throw new RuntimeException("DB 환경 변수 누락");
         }
 
@@ -48,7 +48,7 @@ public class DBConnection {
      * DB 연결(Connection)을 제공합니다.
      */
     public static Connection getConnection() throws SQLException {
-        // 환경 변수에서 읽어온 정보로 DB 연결
+        // 시스템 속성에서 읽어온 정보로 DB 연결
         return DriverManager.getConnection(DB_URL, DB_USERNAME, DB_PASSWORD);
     }
 
