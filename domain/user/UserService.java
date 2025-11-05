@@ -85,8 +85,15 @@ public class UserService {
         User user = userRepository.findByUserId(userId)
                 .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 사용자입니다."));
 
-        if (userRepository.findByPhoneNumber(newPhoneNumber).isPresent()) {
-            throw new IllegalArgumentException("이미 해당 전화번호로 가입된 계정이 존재합니다.");
+        if (newPhoneNumber != null && !newPhoneNumber.trim().isEmpty()) {
+            if (!newPhoneNumber.equals(user.getPhoneNumber())) {
+                //      다른 사용자에게 이미 해당 전화번호가 존재하는지 확인합니다.
+                if (userRepository.findByPhoneNumber(newPhoneNumber).isPresent()) {
+                    throw new IllegalArgumentException("이미 해당 전화번호로 가입된 다른 계정이 존재합니다.");
+                }
+                user.updatephoneNumber(newPhoneNumber);
+            }
+            // 기존 번호와 같으면 아무것도 하지 않고 통과 (업데이트 필요 없음)
         }
         // 2. 비즈니스 로직: User 객체 상태 변경
         if (newPhoneNumber != null && !newPhoneNumber.trim().isEmpty()) {
@@ -137,14 +144,23 @@ public class UserService {
         User user = userRepository.findByUserId(userId)
                 .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 사용자입니다."));
 
-        UserMembershipStrategy newStrategy = switch (i) {
-            case 1 -> new SilverStrategy();
-            case 2 -> new GoldStrategy();
-            case 3 -> new PlatinumStrategy();
-            case 4 -> new VIPStrategy();
-            default ->
-                    throw new IllegalArgumentException("유효하지 않은 등급 번호(" + i + ")입니다. (1=Silver, 2=Gold, 3=Platinum, 4=VIP)");
-        };
+        UserMembershipStrategy newStrategy;
+        switch (i) {
+            case 1:
+                newStrategy = new SilverStrategy();
+                break;
+            case 2:
+                newStrategy = new GoldStrategy();
+                break;
+            case 3:
+                newStrategy = new PlatinumStrategy();
+                break;
+            case 4:
+                newStrategy = new VIPStrategy();
+                break;
+            default:
+                throw new IllegalArgumentException("유효하지 않은 등급 번호(" + i + ")입니다. (1=Silver, 2=Gold, 3=Platinum, 4=VIP)");
+        }
         // 2. 비즈니스 로직: VIP 전략으로 교체 (전략 패턴 Context 업데이트)
 
         // 3. 데이터 접근 위임: 변경된 User 객체를 저장 (DB 업데이트)

@@ -38,7 +38,7 @@ public class UserRepository {
 
         // 쿼리 작성: id 컬럼은 DB에서 자동 생성되므로 쿼리에 포함하지 않습니다.
         String sql = "INSERT INTO user (userId, pw, name, phoneNumber, cardNumber, membership) " +
-                "VALUES (:userId, :password_hash, :name, :phoneNumber, :cardNumber, :membership)";
+                "VALUES (:userId, :pw, :name, :phoneNumber, :cardNumber, :membership)";
 
         // DB 실행: 삽입 후 DB에서 자동 생성된 PK(id) 값을 반환받습니다.
         int generatedId = dbConnection.executeAndReturnKey(sql, params);
@@ -58,7 +58,7 @@ public class UserRepository {
 
         // UPDATE 쿼리 작성: 내부 DB ID를 WHERE 조건으로 사용합니다.
         String sql = "UPDATE user SET " +
-                "pw = :password_hash, name = :name, phoneNumber = :phoneNumber, " +
+                "pw = :pw, name = :name, phoneNumber = :phoneNumber, " +
                 "cardNumber = :cardNumber, membership = :membership " +
                 "WHERE id = :id";
 
@@ -143,15 +143,17 @@ public class UserRepository {
 
     // User 객체를 쿼리 파라미터(Map) 형식으로 변환
     private Map<String, Object> mapUserToDbData(User user) {
+        Map<String, Object> dbData = new HashMap<>();
+
         // DB 스키마: id, userId, pw, name, phoneNumber, cardNumber, membership
-        return Map.of(
-                "userId", user.getUserId(),
-                "pw", user.getPassword(),
-                "name", user.getName(),
-                "phoneNumber", user.getPhoneNumber(),
-                "cardNumber", user.getCardNumber(),
-                "membership", user.getUserMembershipStrategy().name() // 전략 객체의 이름(String) 저장
-        );
+        dbData.put("userId", user.getUserId());
+        dbData.put("pw", user.getPassword());
+        dbData.put("name", user.getName());
+        dbData.put("phoneNumber", user.getPhoneNumber());
+        dbData.put("cardNumber", user.getCardNumber());
+        dbData.put("membership", user.getUserMembershipStrategy().name());
+
+        return dbData;
     }
 
     // DB 데이터(Map)를 User 객체로 변환
