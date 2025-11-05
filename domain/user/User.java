@@ -5,6 +5,7 @@ import domain.user.strategy.UserMembershipStrategy;
 import java.math.BigDecimal;
 
 public class User {
+    private int id;
     private String userId;
     private String password;
     private String name;
@@ -23,6 +24,7 @@ public class User {
     }
 
     // Getter
+    public int getId(){return this.id;}
     public String getUserId() { return userId; }
     public String getPassword() { return password; }
     public String getName() { return name; }
@@ -37,6 +39,7 @@ public class User {
         this.password = newPassword;
     }
     public void updateCardNumber(String cardNumber) { this.cardNumber = cardNumber; }
+    public void updateId(int id) {this.id =id;   }
 
     // 💡 동적으로 전략을 변경할 수 있도록 Setter를 제공할 수도 있음
     public void setDiscountStrategy(UserMembershipStrategy discountStrategy) {
@@ -60,4 +63,5 @@ public class User {
                 ", 등급: " + userMembershipStrategy.name() +
                 '}';
     }
+
 }
