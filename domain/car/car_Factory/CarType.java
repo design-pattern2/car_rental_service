@@ -1,4 +1,4 @@
-package car_Factory;
+package domain.car.car_Factory;
 
 import java.math.BigDecimal;
 
