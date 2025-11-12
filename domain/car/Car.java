@@ -30,7 +30,7 @@ public class Car {
     
     
     @Override public String toString() {
-    	return "Room{id='%s', type=%s, status=%s}".formatted(id, type, status);
+    	return "Car{id='%s', type=%s, status=%s}".formatted(id, type, status);
     }
     
 }
