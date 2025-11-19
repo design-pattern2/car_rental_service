@@ -11,7 +11,7 @@ import java.sql.SQLException;
 import java.util.Optional;
 import java.util.Scanner;
 
-public class Main1 {
+public class Main {
     private static User loggedInUser = null;
 
     public static void main(String[] args) {
