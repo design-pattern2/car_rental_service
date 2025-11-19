@@ -115,14 +115,29 @@ public class UserService {
         return userRepository.save(user);
     }
 
-    // =================================================================
-    // 5. 아이디 및 비밀번호 찾기 (간소화) --회원정보
-    // =================================================================
-    public String findPasswordResetLink(String userId) {
-        // ID 존재 여부 확인을 Repository에 위임
-        return userRepository.findByUserId(userId)
-                .map(u -> "비밀번호 재설정 링크를 발송했습니다.")
-                .orElse("해당 ID로 등록된 정보가 없습니다.");
+// =================================================================
+// 5. 비밀번호 재설정: resetPassword(userId, newRawPassword)
+// =================================================================
+
+    public User resetPassword(String userId, String newRawPassword) { // 메서드명 변경 및 파라미터 추가
+        // 1. 새 비밀번호 유효성 검사
+        if (newRawPassword == null || newRawPassword.trim().isEmpty()) {
+            throw new IllegalArgumentException("새 비밀번호는 비워둘 수 없습니다.");
+        }
+
+        // 2. 데이터 접근 위임: 사용자 조회
+        User user = userRepository.findByUserId(userId)
+                .orElseThrow(() -> new IllegalArgumentException("해당 ID로 등록된 정보가 없습니다."));
+
+        // 3. 비즈니스 로직: 새 비밀번호 해싱
+        String newPasswordHash = hashPassword(newRawPassword);
+
+        // 4. User 객체 상태 변경: 비밀번호 업데이트
+        user.updatePassword(newPasswordHash);
+
+        // 5. 데이터 접근 위임: 변경된 User 객체를 Repository에 저장 요청 (DB 업데이트)
+        // 이 시점에서 User 객체는 새 비밀번호 해시를 가지고 DB에 저장됩니다.
+        return userRepository.save(user);
     }
 
     // =================================================================

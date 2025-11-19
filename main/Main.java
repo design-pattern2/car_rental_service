@@ -2,20 +2,16 @@ package main;
 
 import db.DBConnection;
 import db.EnvLoader;
-import java.sql.Connection;
-import java.sql.SQLException;
-import domain.car.Car;
-import domain.car.car_Factory.*;
-import domain.car.decorator.*;
 import domain.user.User;
 import domain.user.UserRepository;
 import domain.user.UserService;
 
-import java.math.BigDecimal;
+import java.sql.Connection;
+import java.sql.SQLException;
 import java.util.Optional;
 import java.util.Scanner;
 
-public class Main {
+public class Main1 {
     private static User loggedInUser = null;
 
     public static void main(String[] args) {
@@ -32,39 +28,7 @@ public class Main {
         } catch (SQLException e) {
             System.err.println(" DB 연결에 실패했습니다! 오류: " + e.getMessage());
         }
-        System.out.println("=== 팩토리 & 데코레이터 테스트 ===");
 
-        // 1️⃣ 팩토리로 차량 생성
-        CarFactory sedanFactory = new SedanFactory();
-        CarFactory suvFactory = new SuvFactory();
-
-        Car sedan = sedanFactory.createCar("S001");
-        Car suv = suvFactory.createCar("SUV001");
-
-        System.out.println("생성된 차량:");
-        System.out.println(sedan);
-        System.out.println(suv);
-
-        // 2️⃣ 기본 요금 프라이서
-        CarPricer sedanPricer = new BaseCarPricer(sedan);
-        CarPricer suvPricer = new BaseCarPricer(suv);
-
-        System.out.println("\n기본 요금:");
-        System.out.println(sedanPricer.description() + ": " + sedanPricer.quote(sedan));
-        System.out.println(suvPricer.description() + ": " + suvPricer.quote(suv));
-
-        // 3️⃣ 옵션 추가 (데코레이터)
-        CarPricer sedanWithOptions = new SunroofOption(new NavigationOption(new BlackboxOption(sedanPricer)));
-        CarPricer suvWithOptions   = new BlackboxOption(suvPricer);
-
-        System.out.println("\n옵션 적용 후 요금:");
-        System.out.println(sedanWithOptions.description() + ": " + sedanWithOptions.quote(sedan));
-        System.out.println(suvWithOptions.description() + ": " + suvWithOptions.quote(suv));
-
-        // 4️⃣ 차량 상태 변경 테스트
-        sedan.occupy();
-        System.out.println("\n차량 상태 변경 후:");
-        System.out.println(sedan);
     }
     private static void startSimulation(UserService us, Scanner scanner) {
         while (true) {
@@ -106,19 +70,19 @@ public class Main {
         System.out.println("\n" + "-".repeat(40));
         System.out.println("        🚗 [비회원] 회원 관리 시스템 메뉴");
         System.out.println("-".repeat(40));
-        System.out.println(" 1. 회원가입 (signUp)");
+        System.out.println(" 1. 회원가입 ");
         System.out.println(" 2. 로그인 (login)");
-        System.out.println(" 3. 비밀번호 찾기 (findPasswordResetLink)");
+        System.out.println(" 3. 비밀번호 찾기");
         System.out.println(" 0. 종료");
         System.out.println("-".repeat(40));
     }
 
     private static void displayPostLoginMenu() {
         System.out.println("\n" + "-".repeat(40));
-        System.out.println("   👤 [" + loggedInUser.getName() + "님] 회원 관리 시스템 메뉴");
+        System.out.println("   👤 [" + loggedInUser.getUserId() + "님] 회원 관리 시스템 메뉴");
         System.out.println("-".repeat(40));
-        System.out.println(" 1. 정보 조회");
-        System.out.println(" 2. 정보 수정");
+        System.out.println(" 1. 정보 조회 ");
+        System.out.println(" 2. 정보 수정 ");
         System.out.println(" 3. 카드 등록 ");
         System.out.println(" 4. 회원 탈퇴 ");
         System.out.println(" 9. 로그아웃 "); // ⭐️ 로그아웃 추가
@@ -154,10 +118,15 @@ public class Main {
                 }
                 break;
 
-            case 3: // 아이디 및 비밀번호 찾기 (간소화)
-                System.out.println("\n[3. 비밀번호 찾기]");
-                System.out.print("ID: "); id = scanner.nextLine();
-                System.out.println(us.findPasswordResetLink(id));
+            case 3: // 비밀번호 찾기 (-> 새 비밀번호로 즉시 변경)
+                System.out.println("\n[3. 비밀번호 재설정]");
+                System.out.print("재설정할 ID: "); id = scanner.nextLine();
+                System.out.print("새 Password: "); pw = scanner.nextLine();
+
+                // 💡 UserService에  resetPassword(id, newRawPassword) 메서드 사용
+                User resetUser = us.resetPassword(id, pw);
+                System.out.println("✅ 비밀번호 재설정이 완료되었습니다! (" + resetUser.getUserId() + "님)");
+                System.out.println("새 비밀번호로 다시 로그인해주세요.");
                 break;
 
             default:
