@@ -4,111 +4,130 @@ import db.DBConnection;
 
 import java.math.BigDecimal;
 import java.sql.Timestamp;
+import java.time.Duration;
+import java.time.LocalDateTime;
 import java.util.*;
-import java.util.stream.Collectors;
 
+/**
+ * rental 테이블과 상호작용하는 리포지토리.
+ *  - README의 MySQL 스키마에 맞춰 userId/carId는 정수 PK를 사용
+ *  - 비즈니스 계층(RentalService)에서는 RentalRecord를 통해 도메인 정보를 주고받음
+ */
 public class RentalRepository {
-    // === 팀 DB 스키마에 맞게 필요시 수정 ===
-    private static final String TBL = "rental_records";
-    private static final String COL_OPTIONS = "options_json"; // 문자열 CSV로 저장 중
-    // ===========================================
+    private static final String TBL = "rental";
 
     private final DBConnection db;
 
     public RentalRepository(DBConnection db) {
-        this.db = db;
+        this.db = Objects.requireNonNull(db, "db");
     }
 
-    public Optional<RentalRecord> findActiveByCarId(String carId) {
-        String sql = "SELECT * FROM " + TBL + " WHERE car_id = :carId AND status = 'RENTED' ORDER BY id DESC LIMIT 1";
-        return db.queryForObject(sql, Map.of("carId", carId)).map(this::mapRow);
+    /** carId(INT) 기준으로 'RENTED' 상태인 활성 대여가 있는지 확인 */
+    public Optional<RentalRecord> findActiveByCarId(int carId) {
+        String sql = "SELECT * FROM " + TBL + " WHERE carId=:carId AND status='RENTED' LIMIT 1";
+        Map<String, Object> p = Map.of("carId", carId);
+        return db.queryForObject(sql, p).map(this::mapRowToRecord);
     }
 
+    /** PK로 단건 조회 + user 조인으로 로그인 아이디(user.userId)까지 가져오기 */
     public Optional<RentalRecord> findById(long id) {
-        String sql = "SELECT * FROM " + TBL + " WHERE id = :id";
-        return db.queryForObject(sql, Map.of("id", id)).map(this::mapRow);
+        String sql =
+                "SELECT r.*, u.userId AS loginUserId " +
+                "FROM " + TBL + " r " +
+                "JOIN user u ON r.userId = u.id " +
+                "WHERE r.id = :id";
+
+        return db.queryForObject(sql, Map.of("id", id)).map(this::mapRowToRecord);
     }
 
-    public List<RentalRecord> findByUser(String userId) {
-        String sql = "SELECT * FROM " + TBL + " WHERE user_id = :uid ORDER BY id DESC";
-        return db.queryForList(sql, Map.of("uid", userId)).stream().map(this::mapRow).collect(Collectors.toList());
-    }
+    /**
+     * 대여 저장 (README의 rental 테이블)
+     *  - startTime: now
+     *  - endTime  : 예약 종료( startTime + rentalDays )  ← NOT NULL 제약 충족
+     *  - status   : 'RENTED'
+     */
+    public long save(int userId, int carId, RentalRecord r) {
+        String sql =
+                "INSERT INTO " + TBL + " (userId, carId, startTime, endTime, status) " +
+                "VALUES (:userId, :carId, :startTime, :endTime, :status)";
 
-    public long save(RentalRecord r) {
-        String sql = "INSERT INTO " + TBL + " (user_id, car_id, rental_days, start_at, status, " +
-                "fee_strategy, membership_strategy, " + COL_OPTIONS + ", base_fee, option_fee, discount, penalty, total_fee) " +
-                "VALUES (:user_id, :car_id, :rental_days, :start_at, :status, :fee, :mbr, :opts, :base, :opt, :disc, :pen, :total)";
+        LocalDateTime start = r.getStartAt();
+        LocalDateTime scheduledEnd = start.plusDays(r.getRentalDays());
+
         Map<String, Object> p = new HashMap<>();
-        p.put("user_id", r.getUserId());
-        p.put("car_id", r.getCarId());
-        p.put("rental_days", r.getRentalDays());
-        p.put("start_at", Timestamp.valueOf(r.getStartAt()));
-        p.put("status", r.getStatus().name());
-        p.put("fee", r.getFeeStrategyType());
-        p.put("mbr", r.getMembershipStrategyType());
-        p.put("opts", String.join(",", r.getOptions()));
-        p.put("base", r.getBaseFee());
-        p.put("opt", r.getOptionFee());
-        p.put("disc", r.getDiscount());
-        p.put("pen", r.getPenalty());
-        p.put("total", r.getTotalFee());
+        p.put("userId", userId);
+        p.put("carId", carId);
+        p.put("startTime", Timestamp.valueOf(start));
+        p.put("endTime", Timestamp.valueOf(scheduledEnd));
+        p.put("status", "RENTED");
 
-        db.execute(sql, p);
-        // DBConnection이 생성키 반환을 직접 지원하지 않는 경우: LAST_INSERT_ID() 조회
-        Long id = db.queryForObject("SELECT LAST_INSERT_ID() AS id", Map.of())
-                .map(row -> ((Number) row.get("id")).longValue())
-                .orElse(null);
-        if (id != null) r.setId(id);
-        return id == null ? 0L : id;
+        int generatedId = db.executeAndReturnKey(sql, p);
+        r.setId((long) generatedId);
+        return r.getId();
     }
 
-    public void markReturned(long id, BigDecimal penalty, BigDecimal discount, BigDecimal total) {
-        String sql = "UPDATE " + TBL + " SET status='RETURNED', end_at=CURRENT_TIMESTAMP, " +
-                "penalty=:pen, discount=:disc, total_fee=:total WHERE id=:id";
-        Map<String, Object> p = new HashMap<>();
-        p.put("pen", penalty);
-        p.put("disc", discount);
-        p.put("total", total);
-        p.put("id", id);
-        db.execute(sql, p);
+    /** 반납 처리: status='RETURNED', endTime=현재시각. 현재 상태가 RENTED일 때만 반납 처리. */
+    public boolean markReturnedIfRented(long id) {
+        String sql = "UPDATE " + TBL + " SET status='RETURNED', endTime=CURRENT_TIMESTAMP " +
+                     "WHERE id=:id AND status='RENTED'";
+        int affected = db.execute(sql, Map.of("id", id));
+        return affected > 0;
     }
 
-    // ---- Row Mapper ----
-    private RentalRecord mapRow(Map<String, Object> row) {
-        RentalRecord r = new RentalRecord();
-        Object id = row.get("id");
-        if (id != null) r.setId(((Number) id).longValue());
-        r.setUserId(Objects.toString(row.get("user_id"), null));
-        r.setCarId(Objects.toString(row.get("car_id"), null));
-        Object days = row.get("rental_days");
-        if (days != null) r.setRentalDays(((Number) days).intValue());
+    // ===== 내부 매핑 =====
+    private RentalRecord mapRowToRecord(Map<String, Object> row) {
+        RentalRecord rec = new RentalRecord();
 
-        Object st = row.get("start_at");
-        if (st instanceof Timestamp ts) r.setStartAt(ts.toLocalDateTime());
-        Object et = row.get("end_at");
-        if (et instanceof Timestamp ts2) r.setEndAt(ts2.toLocalDateTime());
+        Object idObj = row.get("id");
+        if (idObj != null) {
+            rec.setId(((Number) idObj).longValue());
+        }
 
-        Object status = row.get("status");
-        if (status != null) r.setStatus(RentalRecord.Status.valueOf(status.toString()));
+        // loginUserId 별칭이 존재하면 로그인 아이디로 사용
+        Object loginUserIdObj = row.get("loginUserId");
+        if (loginUserIdObj != null) {
+            rec.setUserId(String.valueOf(loginUserIdObj));
+        } else {
+            // loginUserId가 없으면 Fallback: 정수 FK 그대로 문자열로
+            Object userIdObj = row.get("userId");
+            if (userIdObj != null) {
+                rec.setUserId(String.valueOf(((Number) userIdObj).intValue()));
+            }
+        }
 
-        r.setFeeStrategyType(Objects.toString(row.get("fee_strategy"), null));
-        r.setMembershipStrategyType(Objects.toString(row.get("membership_strategy"), null));
+        Object carIdObj = row.get("carId");
+        if (carIdObj != null) {
+            rec.setCarId(String.valueOf(((Number) carIdObj).intValue()));
+        }
 
-        String opts = Objects.toString(row.get(COL_OPTIONS), "");
-        if (!opts.isBlank()) r.setOptions(Arrays.asList(opts.split("\\s*,\\s*")));
+        LocalDateTime start = toLdt(row.get("startTime"));
+        LocalDateTime end   = toLdt(row.get("endTime"));
+        rec.setStartAt(start);
+        rec.setEndAt(end);
 
-        r.setBaseFee(toBd(row.get("base_fee")));
-        r.setOptionFee(toBd(row.get("option_fee")));
-        r.setDiscount(toBd(row.get("discount")));
-        r.setPenalty(toBd(row.get("penalty")));
-        r.setTotalFee(toBd(row.get("total_fee")));
-        return r;
+        String st = String.valueOf(row.get("status"));
+        rec.setStatus("RETURNED".equalsIgnoreCase(st) ? RentalRecord.Status.RETURNED
+                                                      : RentalRecord.Status.RENTED);
+
+        if (start != null && end != null) {
+            long days = Math.max(1, Duration.between(start, end).toDays());
+            rec.setRentalDays((int) days);
+        }
+
+        // 요금 관련 필드는 DB에 아직 없으므로 도메인 레벨에서만 사용
+        rec.setBaseFee(BigDecimal.ZERO);
+        rec.setOptionFee(BigDecimal.ZERO);
+        rec.setDiscount(BigDecimal.ZERO);
+        rec.setPenalty(BigDecimal.ZERO);
+        rec.setTotalFee(BigDecimal.ZERO);
+
+        return rec;
     }
 
-    private static BigDecimal toBd(Object o) {
-        if (o == null) return BigDecimal.ZERO;
-        if (o instanceof BigDecimal b) return b;
-        if (o instanceof Number n) return BigDecimal.valueOf(n.doubleValue());
-        return new BigDecimal(o.toString());
+    private LocalDateTime toLdt(Object o) {
+        if (o == null) return null;
+        if (o instanceof Timestamp ts) return ts.toLocalDateTime();
+        if (o instanceof java.sql.Date d) return d.toLocalDate().atStartOfDay();
+        return LocalDateTime.parse(o.toString().replace(' ', 'T')); // 안전망
     }
 }

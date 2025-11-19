@@ -139,33 +139,48 @@ public class UserService {
     // =================================================================
     // 7. 전략 패턴 활용 예시: VIP 승급 (비즈니스 로직)
     // =================================================================
-    public User upgradeGrade(String userId, int i) {
+    public User upgradeGrade(String userId) { // i 파라미터 제거
         // 1. 데이터 접근 위임: 사용자 조회
         User user = userRepository.findByUserId(userId)
                 .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 사용자입니다."));
 
-        UserMembershipStrategy newStrategy;
-        switch (i) {
-            case 1:
-                newStrategy = new SilverStrategy();
-                break;
-            case 2:
-                newStrategy = new GoldStrategy();
-                break;
-            case 3:
-                newStrategy = new PlatinumStrategy();
-                break;
-            case 4:
-                newStrategy = new VIPStrategy();
-                break;
-            default:
-                throw new IllegalArgumentException("유효하지 않은 등급 번호(" + i + ")입니다. (1=Silver, 2=Gold, 3=Platinum, 4=VIP)");
-        }
-        // 2. 비즈니스 로직: VIP 전략으로 교체 (전략 패턴 Context 업데이트)
+        // 2. 현재 전략의 클래스 이름 획득 (예: SilverStrategy)
+        // User 클래스에 getDiscountStrategy()가 public 또는 package-private으로 접근 가능하다고 가정
+        String currentStrategyName = user.getUserMembershipStrategy().getClass().getSimpleName();
 
-        // 3. 데이터 접근 위임: 변경된 User 객체를 저장 (DB 업데이트)
+        // 3. 등급 순서 정의 (여기서 다음 전략을 결정)
+        UserMembershipStrategy newStrategy;
+
+        // 이 순서는 실제 전략 클래스 이름과 일치해야 합니다.
+        switch (currentStrategyName) {
+            case "SilverStrategy":
+                newStrategy = new GoldStrategy();
+                System.out.println("✅ " + userId + "님: Silver -> Gold 등급으로 승격되었습니다.");
+                break;
+            case "GoldStrategy":
+                newStrategy = new PlatinumStrategy();
+                System.out.println("✅ " + userId + "님: Gold -> Platinum 등급으로 승격되었습니다.");
+                break;
+            case "PlatinumStrategy":
+                newStrategy = new VIPStrategy();
+                System.out.println("✅ " + userId + "님: Platinum -> VIP 등급으로 승격되었습니다.");
+                break;
+            case "VIPStrategy":
+                throw new IllegalArgumentException("이미 최고 등급(VIP)입니다. 더 이상 승격할 수 없습니다.");
+            default:
+                // 예상치 못한 전략이 할당되어 있을 경우
+                newStrategy = new SilverStrategy(); // 기본값으로 설정하거나 예외 처리 가능
+                System.err.println("⚠️ 알 수 없는 등급: " + currentStrategyName + ". Silver로 재설정합니다.");
+                break;
+        }
+
+        // 4. 비즈니스 로직: 새 전략으로 교체 (전략 패턴 Context 업데이트)
+        user.setDiscountStrategy(newStrategy);
+
+        // 5. 데이터 접근 위임: 변경된 User 객체를 저장 (DB 업데이트)
         return userRepository.save(user);
     }
+
     // =================================================================
     // 8. 카드 등록: registerCard(userId, cardNumber)
     // =================================================================
