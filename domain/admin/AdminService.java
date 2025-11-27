@@ -134,13 +134,8 @@ public class AdminService {
         params.put("name", carName.trim());
 
         int rows = db.execute(insertSql, params);
-        if (rows > 0) {
-            System.out.println("✅ 차량 등록 완료!");
-            System.out.println("   이름: " + carName.trim());
-            System.out.println("   타입: " + type);
-            System.out.println("   일일 대여료: " + fee + "원");
-        } else {
-            System.out.println("❌ 차량 등록 실패 (영향 받은 행 없음)");
+        if (rows <= 0) {
+            throw new IllegalStateException("차량 등록 실패 (영향 받은 행 없음)");
         }
     }
 
