@@ -96,7 +96,7 @@ public class RentalRepository {
         if (idObj != null) {
             // id가 Number인 경우와 String인 경우 모두 처리
             if (idObj instanceof Number) {
-                rec.setId(((Number) idObj).longValue());
+            rec.setId(((Number) idObj).longValue());
             } else {
                 // String인 경우 파싱
                 try {
@@ -117,7 +117,7 @@ public class RentalRepository {
             if (userIdObj != null) {
                 // userId가 Number인 경우와 String인 경우 모두 처리
                 if (userIdObj instanceof Number) {
-                    rec.setUserId(String.valueOf(((Number) userIdObj).intValue()));
+                rec.setUserId(String.valueOf(((Number) userIdObj).intValue()));
                 } else {
                     rec.setUserId(String.valueOf(userIdObj));
                 }
@@ -128,7 +128,7 @@ public class RentalRepository {
         if (carIdObj != null) {
             // carId가 Number인 경우와 String인 경우 모두 처리
             if (carIdObj instanceof Number) {
-                rec.setCarId(String.valueOf(((Number) carIdObj).intValue()));
+            rec.setCarId(String.valueOf(((Number) carIdObj).intValue()));
             } else {
                 rec.setCarId(String.valueOf(carIdObj));
             }

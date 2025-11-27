@@ -88,7 +88,64 @@ public class AdminService {
     // =====================================================================
 
     /**
-     * 차량 등록 기능.
+     * 차량 등록 기능 (ID 자동 생성).
+     *
+     * car 테이블 스키마:
+     *  - id              INT AUTO_INCREMENT PK
+     *  - type            ENUM('SEDAN', 'SUV', 'BIKE')
+     *  - status          VARCHAR(20)   (AVAILABLE, UNAVAILABLE)
+     *  - dailyRentalFee  DECIMAL(10,2)
+     *  - name            VARCHAR(100)  차량 이름
+     */
+    public void addCar(CarType type, BigDecimal dailyRentalFee, String carName) {
+        Objects.requireNonNull(type, "CarType 은 null 일 수 없습니다.");
+
+        // 1) 이름 검증
+        if (carName == null || carName.trim().isEmpty()) {
+            throw new IllegalArgumentException("차량 이름은 필수입니다.");
+        }
+
+        // 2) 차량 이름 중복 검사
+        String checkSql = "SELECT id FROM " + CAR_TBL + " WHERE name = :name";
+        if (db.queryForObject(checkSql, Map.of("name", carName.trim())).isPresent()) {
+            throw new IllegalArgumentException("이미 존재하는 차량 이름입니다: " + carName.trim());
+        }
+
+        // 3) 요금 검증: 필수 입력
+        if (dailyRentalFee == null) {
+            throw new IllegalArgumentException("일일 대여료는 필수입니다.");
+        }
+        if (dailyRentalFee.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new IllegalArgumentException("일일 대여료는 0보다 커야 합니다.");
+        }
+
+        BigDecimal fee = dailyRentalFee;
+
+        // 3) id는 AUTO_INCREMENT이므로 컬럼 목록에서 제외
+        String insertSql =
+                "INSERT INTO " + CAR_TBL +
+                        " (type, status, dailyRentalFee, name) " +
+                        "VALUES (:type, :status, :dailyRentalFee, :name)";
+
+        Map<String, Object> params = new HashMap<>();
+        params.put("type", type.name());
+        params.put("status", CarStatus.AVAILABLE.name());
+        params.put("dailyRentalFee", fee);
+        params.put("name", carName.trim());
+
+        int rows = db.execute(insertSql, params);
+        if (rows > 0) {
+            System.out.println("✅ 차량 등록 완료!");
+            System.out.println("   이름: " + carName.trim());
+            System.out.println("   타입: " + type);
+            System.out.println("   일일 대여료: " + fee + "원");
+        } else {
+            System.out.println("❌ 차량 등록 실패 (영향 받은 행 없음)");
+        }
+    }
+
+    /**
+     * 차량 등록 기능 (ID 지정).
      *
      * car 테이블 예시 스키마:
      *  - id              VARCHAR(50)   PK
@@ -142,19 +199,46 @@ public class AdminService {
     }
 
     /**
-     * 차량 삭제 기능.
+     * 차량 삭제 기능 (ID로 삭제).
+     * 현재 대여 중인 차량(status='RENTED')은 삭제할 수 없습니다.
+     * 과거 대여 기록이 있는 경우, 해당 기록을 먼저 삭제한 후 차량을 삭제합니다.
      */
-    public void deleteCar(String carId) {
-        ensureAdminLoggedIn();
+    public boolean deleteCarById(int carId) {
+        // 1) 현재 대여 중인지 확인 (status='RENTED'인 대여 기록이 있는지)
+        String checkActiveRentalSql = "SELECT id FROM " + RENTAL_TBL + " WHERE carId = :carId AND status = 'RENTED' LIMIT 1";
+        if (db.queryForObject(checkActiveRentalSql, Map.of("carId", carId)).isPresent()) {
+            throw new IllegalStateException("현재 대여 중인 차량은 삭제할 수 없습니다.");
+        }
 
+        // 2) 과거 대여 기록 삭제 (외래키 제약 조건 해결을 위해)
+        String deleteRentalsSql = "DELETE FROM " + RENTAL_TBL + " WHERE carId = :carId";
+        db.execute(deleteRentalsSql, Map.of("carId", carId));
+
+        // 3) 차량 삭제
         String sql = "DELETE FROM " + CAR_TBL + " WHERE id = :id";
         int rows = db.execute(sql, Map.of("id", carId));
 
         if (rows > 0) {
-            System.out.println("[관리자] 차량 삭제 완료 -> ID=" + carId);
+            return true;
         } else {
-            System.out.println("[관리자] 삭제할 차량이 존재하지 않습니다 -> ID=" + carId);
+            return false;
         }
+    }
+
+    /**
+     * 차량 이름으로 차량 정보 조회 (삭제용).
+     */
+    public Optional<Map<String, Object>> findCarByName(String carName) {
+        String sql = "SELECT id, name, type, status FROM " + CAR_TBL + " WHERE name = :name";
+        return db.queryForObject(sql, Map.of("name", carName));
+    }
+
+    /**
+     * 모든 차량 목록 조회 (이름, 상태 포함).
+     */
+    public List<Map<String, Object>> getAllCarsWithStatus() {
+        String sql = "SELECT id, name, type, status FROM " + CAR_TBL + " ORDER BY id";
+        return db.queryForList(sql, Map.of());
     }
 
     /**
@@ -222,5 +306,21 @@ public class AdminService {
             System.out.printf("#%d | user=%s, car=%s, 시작=%s, 종료=%s%n",
                     id, userId, carId, start, end);
         }
+    }
+
+    /**
+     * 전체 대여 기록 조회 (차량 이름, 사용자 이름 포함).
+     * 차량 이름, 사용자 이름, 대여 날짜, 반납 날짜, 상태를 표시하고 연체된 경우 빨간색 이모지 표시.
+     */
+    public List<Map<String, Object>> getAllRentalRecordsWithCarName() {
+        String sql = 
+            "SELECT r.id, r.startTime, r.endTime, r.status, " +
+            "       c.name AS carName, u.name AS userName " +
+            "FROM " + RENTAL_TBL + " r " +
+            "JOIN " + CAR_TBL + " c ON r.carId = c.id " +
+            "JOIN user u ON r.userId = u.id " +
+            "ORDER BY r.id DESC";
+        
+        return db.queryForList(sql, Map.of());
     }
 }

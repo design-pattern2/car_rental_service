@@ -83,7 +83,7 @@ public class UserRepository {
         // 2. DB 데이터(Map) -> User 객체로 변환 (매핑) 및 반환
         return dbDataOpt.flatMap(this::mapDbDataToUser);
     }
-// =================================================================
+    // =================================================================
     // 3. 전화번호 기반 조회 (쿼리 작성 후 DBConnection에 위임)
     // =================================================================
     /**
@@ -93,6 +93,24 @@ public class UserRepository {
         String sql = "SELECT id, userId, pw, name, phoneNumber, cardNumber, membership " +
                 "FROM user WHERE phoneNumber = :phoneNumber";
         Map<String, Object> params = Map.of("phoneNumber", phoneNumber);
+
+        // 1. DBConnection의 실행 메서드 호출 (DB 통신 위임)
+        Optional<Map<String, Object>> dbDataOpt = dbConnection.queryForObject(sql, params);
+
+        // 2. DB 데이터(Map) -> User 객체로 변환 (매핑) 및 반환
+        return dbDataOpt.flatMap(this::mapDbDataToUser);
+    }
+
+    // =================================================================
+    // 3-1. 이름 기반 조회 (중복 확인용)
+    // =================================================================
+    /**
+     * 이름을 기반으로 사용자 정보를 조회합니다.
+     */
+    public Optional<User> findByName(String name) {
+        String sql = "SELECT id, userId, pw, name, phoneNumber, cardNumber, membership " +
+                "FROM user WHERE name = :name";
+        Map<String, Object> params = Map.of("name", name);
 
         // 1. DBConnection의 실행 메서드 호출 (DB 통신 위임)
         Optional<Map<String, Object>> dbDataOpt = dbConnection.queryForObject(sql, params);
@@ -151,7 +169,14 @@ public class UserRepository {
         dbData.put("name", user.getName());
         dbData.put("phoneNumber", user.getPhoneNumber());
         dbData.put("cardNumber", user.getCardNumber());
-        dbData.put("membership", user.getUserMembershipStrategy().name());
+        
+        // membership 필드가 설정되어 있으면 그것을 사용, 없으면 전략 이름 사용
+        String membership = user.getMembership();
+        if (membership != null && !membership.isEmpty()) {
+            dbData.put("membership", membership);
+        } else {
+            dbData.put("membership", user.getUserMembershipStrategy().name());
+        }
 
         return dbData;
     }
@@ -184,12 +209,19 @@ public class UserRepository {
         if (id != 0) {
             user.updateId(id);
         }
+        
+        // membership 값 설정 (관리자 판별을 위해)
+        user.setMembership(membershipType);
 
         return Optional.of(user);
     }
 
     // 저장된 전략 이름에 따라 전략 객체를 생성하는 헬퍼 메서드
     private UserMembershipStrategy createStrategyByType(String typeName) {
+        // ADMIN은 전략이 아니므로 기본 전략(Silver)을 반환
+        if (typeName != null && typeName.equals("ADMIN")) {
+            return new SilverStrategy(); // ADMIN도 기본 전략 사용
+        }
         if (typeName != null && typeName.contains("Gold")) {
             return new GoldStrategy();
         }

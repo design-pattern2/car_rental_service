@@ -36,6 +36,11 @@ public class UserService {
             throw new IllegalArgumentException("이미 해당 전화번호로 가입된 계정이 존재합니다.");
         }
 
+        // 3. ✅ 비즈니스 규칙: 이름 중복 확인
+        if (userRepository.findByName(name).isPresent()) {
+            throw new IllegalArgumentException("이미 존재하는 사용자 이름입니다.");
+        }
+
         // 3. 비즈니스 로직: 비밀번호 해싱
         String passwordHash = hashPassword(rawPassword); // hashPassword는 Bcrypt 시뮬레이션 로직을 사용한다고 가정
 
@@ -46,6 +51,21 @@ public class UserService {
         User newUser = new User(userId, passwordHash, name, phoneNumber, null, initialStrategy);
 
         // 6. 데이터 접근 위임: UserRepository에 저장 요청
+        return userRepository.save(newUser);
+    }
+
+    // =================================================================
+    // 1-1. 관리자 회원가입: signUpAdmin(userId, rawPassword, name, phoneNumber)
+    // =================================================================
+
+    public User signUpAdmin(String userId, String rawPassword, String name, String phoneNumber) {
+        // 일반 회원가입과 동일하지만, membership을 "ADMIN"으로 설정
+        User newUser = signUp(userId, rawPassword, name, phoneNumber);
+        
+        // membership을 "ADMIN"으로 설정
+        newUser.setMembership("ADMIN");
+        
+        // DB에 다시 저장하여 membership 업데이트
         return userRepository.save(newUser);
     }
     // =================================================================
@@ -191,8 +211,12 @@ public class UserService {
 
         // 4. 비즈니스 로직: 새 전략으로 교체 (전략 패턴 Context 업데이트)
         user.setDiscountStrategy(newStrategy);
+        
+        // 5. membership 필드도 업데이트 (DB 저장 시 올바른 값이 저장되도록)
+        String newMembership = newStrategy.getClass().getSimpleName();
+        user.setMembership(newMembership);
 
-        // 5. 데이터 접근 위임: 변경된 User 객체를 저장 (DB 업데이트)
+        // 6. 데이터 접근 위임: 변경된 User 객체를 저장 (DB 업데이트)
         return userRepository.save(user);
     }
 
