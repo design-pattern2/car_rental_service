@@ -1,8 +1,8 @@
 package domain.admin;
 
 import db.DBConnection;
-import domain.car.car_Factory.CarStatus;
-import domain.car.car_Factory.CarType;
+import domain.car.carFactory.CarStatus;
+import domain.car.carFactory.CarType;
 import domain.user.User;
 import domain.user.UserService;
 
