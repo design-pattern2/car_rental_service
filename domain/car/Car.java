@@ -3,8 +3,8 @@ package domain.car;
 import java.math.BigDecimal;
 import java.util.Objects;
 
-import domain.car.car_Factory.CarStatus;
-import domain.car.car_Factory.CarType;
+import domain.car.carFactory.CarStatus;
+import domain.car.carFactory.CarType;
 
 public class Car {
 	private final String id;
