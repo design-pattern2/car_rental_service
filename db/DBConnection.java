@@ -159,7 +159,10 @@ public class DBConnection {
         int columnCount = metaData.getColumnCount();
 
         for (int i = 1; i <= columnCount; i++) {
-            rowMap.put(metaData.getColumnName(i), rs.getObject(i));
+            // getColumnLabel은 AS 별칭을 반환하고, 별칭이 없으면 컬럼명을 반환
+            // getColumnName은 항상 실제 컬럼명만 반환
+            String columnLabel = metaData.getColumnLabel(i);
+            rowMap.put(columnLabel, rs.getObject(i));
         }
         return rowMap;
     }

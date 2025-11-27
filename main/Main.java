@@ -21,8 +21,11 @@ import domain.user.UserService;
 import java.math.BigDecimal;
 import java.sql.Connection;
 import java.sql.SQLException;
+import java.sql.Timestamp;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Objects;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -33,6 +36,8 @@ public class Main {
     private static boolean isAdmin = false;
     // 대여 시 생성된 RentalRecord를 메모리에 저장 (반납 시 정보 유지)
     private static Map<Long, RentalRecord> rentalRecordCache = new HashMap<>();
+    // 현재 시즌 (관리자가 변경 가능, 기본값: BaseFeeStrategy)
+    private static FeeStrategy currentSeason = new BaseFeeStrategy();
     
     /**
      * BigDecimal을 정수 문자열로 변환 (소수점 제거)
@@ -157,8 +162,6 @@ public class Main {
             // ⭐️ 로그인 상태에 따라 다른 메뉴를 보여줍니다.
             if (loggedInUser == null) {
                 displayPreLoginMenu();
-            } else if (isAdmin) {
-                displayAdminMenu();
             } else {
                 displayPostLoginMenu();
             }
@@ -176,10 +179,8 @@ public class Main {
                 // ⭐️ 로그인 상태에 따라 다른 실행 로직을 호출합니다.
                 if (loggedInUser == null) {
                     executePreLoginMenu(menu, us, adminService, scanner);
-                } else if (isAdmin) {
-                    executeAdminMenu(menu, adminService, scanner);
                 } else {
-                    executePostLoginMenu(menu, us, carRepository, rentalService, paymentService, scanner);
+                    executePostLoginMenu(menu, us, adminService, carRepository, rentalService, paymentService, scanner);
                 }
 
             } catch (NumberFormatException e) {
@@ -219,19 +220,35 @@ public class Main {
 
     private static void displayPostLoginMenu() {
         System.out.println("\n" + "-".repeat(40));
-        System.out.println("👤 [" + loggedInUser.getName() + "님] 회원 관리 시스템 메뉴");
+        String role = isAdmin ? "관리자" : "회원";
+        System.out.println("👤 [" + loggedInUser.getName() + "님] 회원 관리 시스템 메뉴 [" + role + "]");
         System.out.println("-".repeat(40));
-        System.out.println(" 1. 정보 조회 ");
-        System.out.println(" 2. 정보 수정 ");
-        System.out.println(" 3. 비밀번호 재설정 ");
-        System.out.println(" 4. 카드 등록 ");
-        System.out.println(" 5. 회원 탈퇴 ");
-        System.out.println(" 6. 빌릴 수 있는 차량 조회 ");
-        System.out.println(" 7. 차량 대여 ");
-        System.out.println(" 8. 차량 반납 ");
-        System.out.println(" 9. 결제 금액 확인 ");
-        System.out.println(" 10. 로그아웃 ");
-        System.out.println(" 0. 종료");
+        
+        if (isAdmin) {
+            // 관리자 메뉴
+            System.out.println(" 1. 정보 조회 ");
+            System.out.println(" 2. 정보 수정 ");
+            System.out.println(" 3. 비밀번호 재설정 ");
+            System.out.println(" 4. 차량 등록 ");
+            System.out.println(" 5. 차량 삭제 ");
+            System.out.println(" 6. 대여 기록 조회 ");
+            System.out.println(" 7. 시즌 변경 ");
+            System.out.println(" 8. 로그아웃 ");
+            System.out.println(" 0. 종료");
+        } else {
+            // 일반 사용자 메뉴
+            System.out.println(" 1. 정보 조회 ");
+            System.out.println(" 2. 정보 수정 ");
+            System.out.println(" 3. 비밀번호 재설정 ");
+            System.out.println(" 4. 카드 등록 ");
+            System.out.println(" 5. 회원 탈퇴 ");
+            System.out.println(" 6. 빌릴 수 있는 차량 조회 ");
+            System.out.println(" 7. 차량 대여 ");
+            System.out.println(" 8. 차량 반납 ");
+            System.out.println(" 9. 결제 금액 확인 ");
+            System.out.println(" 10. 로그아웃 ");
+            System.out.println(" 0. 종료");
+        }
         System.out.println("-".repeat(40));
     }
 
@@ -266,8 +283,8 @@ public class Main {
                     if (adminPassword == null || !adminPassword.equals(envAdminPassword)) {
                         throw new IllegalArgumentException("관리자 암호가 올바르지 않습니다.");
                     }
-                    // 일반 회원가입과 동일하게 처리 (ID가 'admin'이면 관리자 권한)
-                    User adminUser = us.signUp(id, pw, name, phone);
+                    // 관리자 회원가입: membership을 "ADMIN"으로 설정
+                    User adminUser = us.signUpAdmin(id, pw, name, phone);
                     System.out.println("✅ " + adminUser.getName() + "님 관리자 회원가입이 완료되었습니다!");
                 } catch (IllegalArgumentException e) {
                     System.err.println("❌ " + e.getMessage());
@@ -285,8 +302,9 @@ public class Main {
                 if (userOpt.isPresent()) {
                     loggedInUser = userOpt.get(); // ⭐️ 로그인 성공 시 User 객체 저장
                     
-                    // 관리자 여부 자동 확인 (userId가 "admin"인지 확인)
-                    isAdmin = "admin".equals(loggedInUser.getUserId());
+                    // 관리자 여부 자동 확인 (DB의 membership 컬럼이 "ADMIN"인지 확인)
+                    String membership = loggedInUser.getMembership();
+                    isAdmin = membership != null && membership.equals("ADMIN");
                     
                     if (isAdmin) {
                         System.out.println("✅ 관리자로 로그인되었습니다! 환영합니다, " + loggedInUser.getName() + "님.");
@@ -339,7 +357,18 @@ public class Main {
                 System.out.println("\n[2. 차량 삭제]");
                 System.out.print("삭제할 차량 ID: "); 
                 String deleteCarId = scanner.nextLine();
-                adminService.deleteCar(deleteCarId);
+                // 이 메서드는 사용되지 않지만, 호환성을 위해 유지
+                try {
+                    int carIdInt = Integer.parseInt(deleteCarId);
+                    boolean deleted = adminService.deleteCarById(carIdInt);
+                    if (deleted) {
+                        System.out.println("[관리자] 차량 삭제 완료 -> ID=" + deleteCarId);
+                    } else {
+                        System.out.println("[관리자] 삭제할 차량이 존재하지 않습니다 -> ID=" + deleteCarId);
+                    }
+                } catch (NumberFormatException e) {
+                    System.err.println("❌ 올바른 차량 ID를 입력해주세요.");
+                }
                 break;
                 
             case 3: // 전체 차량 조회
@@ -364,11 +393,392 @@ public class Main {
                 break;
         }
     }
-    private static void executePostLoginMenu(int menu, UserService us, CarRepository carRepository,
-                                            RentalService rentalService, PaymentService paymentService,
-                                            Scanner scanner) {
+    private static void executePostLoginMenu(int menu, UserService us, AdminService adminService,
+                                            CarRepository carRepository, RentalService rentalService, 
+                                            PaymentService paymentService, Scanner scanner) {
         String currentId = loggedInUser.getUserId(); // ⭐️ 로그인된 ID 사용
 
+        // 관리자와 일반 사용자 메뉴 분기
+        if (isAdmin) {
+            switch (menu) {
+                case 1: // 정보 조회
+                    System.out.println("\n[1. 정보 조회]");
+                    Optional<User> userOpt = us.getUserInfo(currentId);
+                    userOpt.ifPresentOrElse(
+                            user -> {
+                                loggedInUser = user;
+                                System.out.println("✅ " + user.getName() + "님의 정보는 다음과 같습니다.");
+                                System.out.println("ID: " + user.getUserId());
+                                System.out.println("이름: " + user.getName());
+                                System.out.println("전화번호: " + user.getPhoneNumber());
+                                // 관리자는 membership이 "ADMIN"이면 "ADMIN"으로 표시
+                                String membership = user.getMembership();
+                                String gradeDisplay = (membership != null && membership.equals("ADMIN")) 
+                                    ? "ADMIN" 
+                                    : user.getUserMembershipStrategy().name().replace("Strategy", "").toUpperCase();
+                                System.out.println("등급: " + gradeDisplay);
+                            },
+                            () -> System.err.println("❌ 사용자 정보를 찾을 수 없습니다. (내부 오류)")
+                    );
+                    break;
+
+                case 2: // 정보 수정
+                    System.out.println("\n[2. 정보 수정]");
+                    System.out.println("⚠️ 변경하지 않을 항목은 Enter만 누르세요.");
+                    System.out.print("새 이름: "); String name = scanner.nextLine();
+                    System.out.print("새 Password: "); String pw = scanner.nextLine();
+                    System.out.print("새 전화번호 (010...): "); String phone = scanner.nextLine();
+
+                    name = name.trim().isEmpty() ? null : name.trim();
+                    pw = pw.trim().isEmpty() ? null : pw.trim();
+                    phone = phone.trim().isEmpty() ? null : phone.trim();
+
+                    User updatedUser = us.updateUserInfo(currentId, name, pw, phone);
+                    loggedInUser = updatedUser;
+                    System.out.println("✅ 사용자 정보 수정 완료!");
+                    break;
+
+                case 3: // 비밀번호 재설정
+                    System.out.println("\n[3. 비밀번호 재설정]");
+                    System.out.print("새 비밀번호: "); 
+                    String newPassword = scanner.nextLine();
+                    if (newPassword.trim().isEmpty()) {
+                        System.err.println("❌ 비밀번호는 비워둘 수 없습니다.");
+                        break;
+                    }
+                    
+                    User resetUser = us.resetPassword(currentId, newPassword);
+                    loggedInUser = resetUser;
+                    System.out.println("✅ 비밀번호 재설정이 완료되었습니다!");
+                    break;
+
+                case 4: // 차량 등록
+                    System.out.println("\n[4. 차량 등록]");
+                    try {
+                        // 1) 차량 타입 선택
+                        System.out.println("차량 타입 선택:");
+                        System.out.println("  1. SEDAN");
+                        System.out.println("  2. SUV");
+                        System.out.println("  3. BIKE");
+                        System.out.print("선택: ");
+                        String typeInput = scanner.nextLine().trim();
+                        int typeChoice;
+                        try {
+                            typeChoice = Integer.parseInt(typeInput);
+                        } catch (NumberFormatException e) {
+                            System.err.println("❌ 숫자를 입력해주세요.");
+                            break;
+                        }
+                        
+                        CarType type = switch (typeChoice) {
+                            case 1 -> CarType.SEDAN;
+                            case 2 -> CarType.SUV;
+                            case 3 -> CarType.BIKE;
+                            default -> {
+                                System.err.println("❌ 잘못된 타입 선택입니다. (1-3 중 선택)");
+                                yield null;
+                            }
+                        };
+                        
+                        if (type == null) {
+                            break;
+                        }
+                        
+                        // 2) 차량 이름 입력
+                        System.out.print("차량 이름: ");
+                        String carName = scanner.nextLine().trim();
+                        if (carName.isEmpty()) {
+                            System.err.println("❌ 차량 이름은 필수입니다.");
+                            break;
+                        }
+                        
+                        // 3) 일일 대여료 입력 (필수)
+                        System.out.print("일일 대여료: ");
+                        String feeInput = scanner.nextLine().trim();
+                        if (feeInput.isEmpty()) {
+                            System.err.println("❌ 일일 대여료는 필수입니다.");
+                            break;
+                        }
+                        
+                        BigDecimal dailyRentalFee;
+                        try {
+                            dailyRentalFee = new BigDecimal(feeInput);
+                            if (dailyRentalFee.compareTo(BigDecimal.ZERO) <= 0) {
+                                System.err.println("❌ 일일 대여료는 0보다 커야 합니다.");
+                                break;
+                            }
+                        } catch (NumberFormatException e) {
+                            System.err.println("❌ 올바른 숫자를 입력해주세요.");
+                            break;
+                        }
+                        
+                        // 4) 차량 등록
+                        adminService.addCar(type, dailyRentalFee, carName);
+                        
+                    } catch (Exception e) {
+                        System.err.println("❌ 차량 등록 실패: " + e.getMessage());
+                    }
+                    break;
+
+                case 5: // 차량 삭제
+                    System.out.println("\n[5. 차량 삭제]");
+                    try {
+                        // 1) 모든 차량 목록 조회 및 표시
+                        List<Map<String, Object>> allCars = adminService.getAllCarsWithStatus();
+                        
+                        if (allCars.isEmpty()) {
+                            System.out.println("❌ 등록된 차량이 없습니다.");
+                            break;
+                        }
+                        
+                        System.out.println("\n현재 등록된 차량 목록:");
+                        System.out.println("-".repeat(60));
+                        for (int i = 0; i < allCars.size(); i++) {
+                            Map<String, Object> car = allCars.get(i);
+                            String carName = Objects.toString(car.get("name"), "");
+                            String carType = Objects.toString(car.get("type"), "");
+                            String carStatusDisplay = Objects.toString(car.get("status"), "");
+                            
+                            System.out.printf("%d. 이름: %s | 타입: %s | 상태: %s%n", 
+                                i + 1, carName, carType, carStatusDisplay);
+                        }
+                        System.out.println("-".repeat(60));
+                        
+                        // 2) 삭제할 차량 선택 (차량 이름 입력)
+                        System.out.print("삭제할 차량 이름 입력: ");
+                        String carNameToDelete = scanner.nextLine().trim();
+                        
+                        if (carNameToDelete.isEmpty()) {
+                            System.err.println("❌ 차량 이름을 입력해주세요.");
+                            break;
+                        }
+                        
+                        // 3) 차량 조회
+                        Optional<Map<String, Object>> carOpt = adminService.findCarByName(carNameToDelete);
+                        
+                        if (carOpt.isEmpty()) {
+                            System.err.println("❌ 해당 이름의 차량을 찾을 수 없습니다.");
+                            break;
+                        }
+                        
+                        Map<String, Object> carToDelete = carOpt.get();
+                        String carStatus = Objects.toString(carToDelete.get("status"), "");
+                        Object idObj = carToDelete.get("id");
+                        int carId = (idObj instanceof Number) ? ((Number) idObj).intValue() : 0;
+                        
+                        // 4) 상태 확인
+                        if ("UNAVAILABLE".equalsIgnoreCase(carStatus)) {
+                            System.err.println("❌ 현재 렌트중인 차는 삭제할 수 없습니다.");
+                            break;
+                        }
+                        
+                        // 5) 삭제 확인
+                        System.out.println("⚠️  정말 삭제하시겠습니까? (yes/no)");
+                        System.out.print("선택: ");
+                        String confirm = scanner.nextLine().trim().toLowerCase();
+                        
+                        if ("yes".equals(confirm)) {
+                            try {
+                                boolean deleted = adminService.deleteCarById(carId);
+                                if (deleted) {
+                                    System.out.println("✅ 차량 삭제가 완료되었습니다.");
+                                } else {
+                                    System.err.println("❌ 차량 삭제에 실패했습니다.");
+                                }
+                            } catch (IllegalStateException e) {
+                                // 현재 대여 중인 경우
+                                System.err.println("❌ " + e.getMessage());
+                            } catch (Exception deleteException) {
+                                System.err.println("❌ 차량 삭제 실패: " + deleteException.getMessage());
+                            }
+                        } else if ("no".equals(confirm)) {
+                            System.out.println("❌ 차량 삭제가 취소되었습니다.");
+                        } else {
+                            System.err.println("❌ 'yes' 또는 'no'를 입력해주세요.");
+                        }
+                        
+                    } catch (Exception e) {
+                        System.err.println("❌ 차량 삭제 실패: " + e.getMessage());
+                    }
+                    break;
+
+                case 6: // 대여 기록 조회
+                    System.out.println("\n[6. 대여 기록 조회]");
+                    try {
+                        List<Map<String, Object>> rentalRecords = adminService.getAllRentalRecordsWithCarName();
+                        
+                        if (rentalRecords.isEmpty()) {
+                            System.out.println("❌ 등록된 대여 기록이 없습니다.");
+                            break;
+                        }
+                        
+                        System.out.println("\n전체 대여 기록:");
+                        System.out.println("-".repeat(40));
+                        
+                        LocalDateTime now = LocalDateTime.now();
+                        
+                        for (int i = 0; i < rentalRecords.size(); i++) {
+                            Map<String, Object> record = rentalRecords.get(i);
+                            
+                            // 연체 여부 확인
+                            Object endTimeObj = record.get("endTime");
+                            LocalDateTime endTime = null;
+                            boolean isOverdue = false;
+                            
+                            if (endTimeObj != null) {
+                                if (endTimeObj instanceof Timestamp) {
+                                    endTime = ((Timestamp) endTimeObj).toLocalDateTime();
+                                } else if (endTimeObj instanceof LocalDateTime) {
+                                    endTime = (LocalDateTime) endTimeObj;
+                                }
+                                
+                                // 연체 확인: status가 RENTED이고 현재 시간이 endTime보다 늦으면 연체
+                                String recordStatus = Objects.toString(record.get("status"), "");
+                                if ("RENTED".equalsIgnoreCase(recordStatus) && endTime != null && now.isAfter(endTime)) {
+                                    isOverdue = true;
+                                }
+                            }
+                            
+                            // 차량 이름 - 모든 가능한 키 확인
+                            String carName = null;
+                            if (record.containsKey("carName")) {
+                                carName = Objects.toString(record.get("carName"), "");
+                            } else if (record.containsKey("c.name")) {
+                                carName = Objects.toString(record.get("c.name"), "");
+                            }
+                            if (carName == null || carName.isEmpty() || "null".equals(carName)) {
+                                carName = "알 수 없음";
+                            }
+                            
+                            // 사용자 이름 - 모든 가능한 키 확인
+                            String userName = null;
+                            if (record.containsKey("userName")) {
+                                userName = Objects.toString(record.get("userName"), "");
+                            } else if (record.containsKey("u.name")) {
+                                userName = Objects.toString(record.get("u.name"), "");
+                            }
+                            if (userName == null || userName.isEmpty() || "null".equals(userName)) {
+                                userName = "알 수 없음";
+                            }
+                            
+                            // 대여 날짜
+                            Object startTimeObj = record.get("startTime");
+                            String startTimeStr = "";
+                            if (startTimeObj != null) {
+                                if (startTimeObj instanceof Timestamp) {
+                                    startTimeStr = ((Timestamp) startTimeObj).toLocalDateTime().toString();
+                                } else if (startTimeObj instanceof LocalDateTime) {
+                                    startTimeStr = startTimeObj.toString();
+                                } else {
+                                    startTimeStr = startTimeObj.toString();
+                                }
+                                // 날짜 형식 간소화 (시간 부분 제거)
+                                if (startTimeStr.contains("T")) {
+                                    startTimeStr = startTimeStr.substring(0, startTimeStr.indexOf("T"));
+                                }
+                            }
+                            
+                            // 반납 날짜
+                            String endTimeStr = "";
+                            if (endTime != null) {
+                                endTimeStr = endTime.toString();
+                                if (endTimeStr.contains("T")) {
+                                    endTimeStr = endTimeStr.substring(0, endTimeStr.indexOf("T"));
+                                }
+                            }
+                            
+                            // 상태
+                            String status = Objects.toString(record.get("status"), "");
+                            
+                            // 연체 표시
+                            String overdueIcon = isOverdue ? "🔴 " : "";
+                            
+                            // 세로로 출력
+                            System.out.println(overdueIcon + "차량: " + carName);
+                            System.out.println("사용자: " + userName);
+                            System.out.println("대여 날짜: " + startTimeStr);
+                            System.out.println("반납 날짜: " + endTimeStr);
+                            System.out.println("상태: " + status);
+                            
+                            // 마지막 항목이 아니면 구분선 추가
+                            if (i < rentalRecords.size() - 1) {
+                                System.out.println();
+                            }
+                        }
+                        System.out.println("-".repeat(40));
+                        
+                    } catch (Exception e) {
+                        System.err.println("❌ 대여 기록 조회 실패: " + e.getMessage());
+                        e.printStackTrace();
+                    }
+                    break;
+
+                case 7: // 시즌 변경
+                    System.out.println("\n[7. 시즌 변경]");
+                    try {
+                        // 현재 시즌 표시
+                        String currentSeasonName = "";
+                        if (currentSeason instanceof PeakSeasonFeeStrategy) {
+                            currentSeasonName = "성수기 (20% 할증)";
+                        } else if (currentSeason instanceof OffSeasonFeeStrategy) {
+                            currentSeasonName = "비수기 (10% 할인)";
+                        } else {
+                            currentSeasonName = "기본";
+                        }
+                        
+                        System.out.println("현재 시즌: " + currentSeasonName);
+                        System.out.println("\n변경할 시즌 선택:");
+                        System.out.println("  1. 기본");
+                        System.out.println("  2. 성수기 (20% 할증)");
+                        System.out.println("  3. 비수기 (10% 할인)");
+                        System.out.print("선택: ");
+                        String seasonChoice = scanner.nextLine().trim();
+                        
+                        FeeStrategy newSeason = null;
+                        String newSeasonName = "";
+                        switch (seasonChoice) {
+                            case "1":
+                                newSeason = new BaseFeeStrategy();
+                                newSeasonName = "기본";
+                                break;
+                            case "2":
+                                newSeason = new PeakSeasonFeeStrategy();
+                                newSeasonName = "성수기 (20% 할증)";
+                                break;
+                            case "3":
+                                newSeason = new OffSeasonFeeStrategy();
+                                newSeasonName = "비수기 (10% 할인)";
+                                break;
+                            default:
+                                System.err.println("❌ 잘못된 선택입니다. (1-3 중 선택)");
+                                break;
+                        }
+                        
+                        if (newSeason != null) {
+                            currentSeason = newSeason;
+                            System.out.println("✅ 시즌이 '" + newSeasonName + "'로 변경되었습니다.");
+                            System.out.println("   (이후 모든 차량 대여에 적용됩니다)");
+                        }
+                        
+                    } catch (Exception e) {
+                        System.err.println("❌ 시즌 변경 실패: " + e.getMessage());
+                    }
+                    break;
+
+                case 8: // 로그아웃
+                    System.out.println("\n🚪 로그아웃 되었습니다.");
+                    loggedInUser = null;
+                    isAdmin = false;
+                    break;
+
+                default:
+                    System.err.println("\n🚨 [오류] 유효하지 않은 메뉴 번호입니다.");
+                    break;
+            }
+            return;
+        }
+
+        // 일반 사용자 메뉴
         switch (menu) {
             case 1: // 정보 조회
                 System.out.println("\n[1. 정보 조회]");
@@ -381,7 +791,12 @@ public class Main {
                             System.out.println("ID: " + user.getUserId());
                             System.out.println("이름: " + user.getName());
                             System.out.println("전화번호: " + user.getPhoneNumber());
-                            System.out.println("등급: " + user.getUserMembershipStrategy().name());
+                            // 관리자는 membership이 "ADMIN"이면 "ADMIN"으로 표시
+                            String membership = user.getMembership();
+                            String gradeDisplay = (membership != null && membership.equals("ADMIN")) 
+                                ? "ADMIN" 
+                                : user.getUserMembershipStrategy().name().replace("Strategy", "").toUpperCase();
+                            System.out.println("등급: " + gradeDisplay);
                         },
                         () -> System.err.println("❌ 사용자 정보를 찾을 수 없습니다. (내부 오류)")
                 );
@@ -542,21 +957,8 @@ public class Main {
                     }
                 }
                 
-                // 5) 요금 정책 선택
-                System.out.println("요금 정책 선택:");
-                System.out.println("  1. 기본 요금 (BaseFeeStrategy)");
-                System.out.println("  2. 성수기 요금 (PeakSeasonFeeStrategy) - 20% 할증");
-                System.out.println("  3. 비수기 요금 (OffSeasonFeeStrategy) - 10% 할인");
-                System.out.print("선택 (기본값: 1): ");
-                String strategyChoice = scanner.nextLine().trim();
-                FeeStrategy feeStrategy;
-                if ("2".equals(strategyChoice)) {
-                    feeStrategy = new PeakSeasonFeeStrategy();
-                } else if ("3".equals(strategyChoice)) {
-                    feeStrategy = new OffSeasonFeeStrategy();
-                } else {
-                    feeStrategy = new BaseFeeStrategy(); // 기본값
-                }
+                // 5) 요금 정책: 현재 설정된 시즌 사용 (사용자 선택 없음)
+                FeeStrategy feeStrategy = currentSeason;
                 
                 // 6) 대여 실행 및 요금 계산 과정 출력
                 try {
@@ -907,8 +1309,11 @@ public class Main {
                     System.out.println("-------------------\n");
                     
                     // 등급 승급 확인 및 메시지 출력
+                    // 반납 후 사용자 정보를 다시 조회하여 최신 등급 정보 가져오기
                     User userAfterReturn = us.getUserInfo(currentId)
                             .orElseThrow(() -> new IllegalArgumentException("사용자를 찾을 수 없습니다."));
+                    // ⭐️ 반납 후 등급이 승급되었을 수 있으므로 loggedInUser 갱신
+                    loggedInUser = userAfterReturn;
                     String membershipAfter = userAfterReturn.getUserMembershipStrategy().getClass().getSimpleName();
                     
                     if (!membershipBefore.equals(membershipAfter)) {

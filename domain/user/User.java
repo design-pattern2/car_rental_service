@@ -11,6 +11,7 @@ public class User {
     private String name;
     private String phoneNumber;
     private String cardNumber;
+    private String membership; // DB의 membership 컬럼 값 (예: "SilverStrategy", "ADMIN" 등)
     private UserMembershipStrategy userMembershipStrategy; // ✅ 할인 전략 객체만 유지
 
     // 생성자: 사용자 정보와 함께 사용할 전략 객체를 바로 주입받음(사용횟수 따라도 될듯)
@@ -31,6 +32,7 @@ public class User {
     public String getPhoneNumber(){return phoneNumber;}
     public UserMembershipStrategy getUserMembershipStrategy(){return userMembershipStrategy;}
     public String getCardNumber() { return cardNumber; }
+    public String getMembership() { return membership; }
 
 
     public void updateName(String name) { this.name = name; }
@@ -40,6 +42,7 @@ public class User {
     }
     public void updateCardNumber(String cardNumber) { this.cardNumber = cardNumber; }
     public void updateId(int id) {this.id =id;   }
+    public void setMembership(String membership) { this.membership = membership; }
 
     // 💡 동적으로 전략을 변경할 수 있도록 Setter를 제공할 수도 있음
     public void setDiscountStrategy(UserMembershipStrategy discountStrategy) {
