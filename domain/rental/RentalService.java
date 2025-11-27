@@ -135,20 +135,35 @@ public class RentalService {
      *  4) 회원 등급 자동 승급
      *  5) 차량 상태 AVAILABLE로 변경
      */
-    public void returnCar(long rentalId, Car car) {
+    public void returnCar(long rentalId, Car car, RentalRecord cachedRecord) {
         Objects.requireNonNull(car, "car");
+        Objects.requireNonNull(cachedRecord, "cachedRecord");
 
-        // 1) DB에서 대여 레코드 조회
+        // 1) DB에서 대여 레코드 조회 (상태 업데이트용)
         RentalRecord rec = rentalRepository.findById(rentalId)
                 .orElseThrow(() -> new IllegalArgumentException("대여 레코드를 찾을 수 없습니다: id=" + rentalId));
 
         // 2) now 기준 연체 패널티 계산
         BigDecimal penalty = calculatePenaltyNow(rec, car);
-        BigDecimal discount = BigDecimal.ZERO; // 결제 모듈에서 할인 확정 시 이 값 반영
-        BigDecimal total = rec.getBaseFee()
-                .add(rec.getOptionFee())
-                .add(penalty)
-                .subtract(discount);
+        
+        // 3) 회원 등급 할인 계산
+        String loginUserId = rec.getUserId();
+        User user = userService.getUserInfo(loginUserId)
+                .orElseThrow(() -> new IllegalArgumentException("사용자를 찾을 수 없습니다: " + loginUserId));
+        
+        // 대여 시 요금 (캐시에서 가져온 baseFee + optionFee)
+        // penalty는 할인 계산에 포함하지 않음 (반납 시 추가되는 것이므로)
+        BigDecimal baseFee = cachedRecord.getBaseFee() != null ? cachedRecord.getBaseFee() : BigDecimal.ZERO;
+        BigDecimal optionFee = cachedRecord.getOptionFee() != null ? cachedRecord.getOptionFee() : BigDecimal.ZERO;
+        BigDecimal rentalFee = baseFee.add(optionFee);
+        
+        // 할인 적용: applyDiscount는 할인된 금액을 반환하므로, 할인 금액 = 원래 금액 - 할인된 금액
+        // 할인은 대여 시 요금(rentalFee)에만 적용
+        BigDecimal discountedAmount = user.applyDiscount(rentalFee);
+        BigDecimal discount = rentalFee.subtract(discountedAmount);
+        
+        // 최종 결제 금액 = 할인된 대여 시 요금 + penalty
+        BigDecimal total = discountedAmount.add(penalty);
 
         // 3) DB 상태 업데이트 (status='RETURNED', endTime=현재시각)
         boolean updated = rentalRepository.markReturnedIfRented(rentalId);
@@ -158,23 +173,37 @@ public class RentalService {
 
         // 4) 회원 등급 자동 승급
         // RentalRecord.userId 는 로그인 아이디(user.userId)라고 가정
-        String loginUserId = rec.getUserId();
+        String userIdForUpgrade = rec.getUserId();
         try {
-            userService.upgradeGrade(loginUserId);
+            userService.upgradeGrade(userIdForUpgrade);
         } catch (IllegalArgumentException e) {
             // 이미 VIP이거나 사용자가 없을 때 등: 반납은 성공시키되, 승급 실패는 로그만
             System.err.println("등급 승급 중 오류: " + e.getMessage());
         }
 
-        // 5) 메모리 상에서도 요약 정보 업데이트
+        // 5) 메모리 상에서도 요약 정보 업데이트 (캐시된 레코드도 업데이트)
         rec.setEndAt(LocalDateTime.now());
         rec.setStatus(RentalRecord.Status.RETURNED);
         rec.setPenalty(penalty);
         rec.setDiscount(discount);
         rec.setTotalFee(total);
+        
+        // 캐시된 레코드도 업데이트
+        cachedRecord.setEndAt(LocalDateTime.now());
+        cachedRecord.setStatus(RentalRecord.Status.RETURNED);
+        cachedRecord.setPenalty(penalty);
+        cachedRecord.setDiscount(discount);
+        cachedRecord.setTotalFee(total);
 
         // 6) 차량 상태 해제
         car.release();
+    }
+    
+    // 기존 메서드 호환성을 위한 오버로드
+    public void returnCar(long rentalId, Car car) {
+        RentalRecord rec = rentalRepository.findById(rentalId)
+                .orElseThrow(() -> new IllegalArgumentException("대여 레코드를 찾을 수 없습니다: id=" + rentalId));
+        returnCar(rentalId, car, rec);
     }
 
     // ====== 내부 헬퍼 메서드 ======
