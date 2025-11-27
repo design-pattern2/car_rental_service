@@ -2,12 +2,14 @@ package domain.car;
 
 import db.DBConnection;
 
+import java.math.BigDecimal;
 import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;
 
 import domain.car.carFactory.CarFactory;
 import domain.car.carFactory.CarFactoryProvider;
+import domain.car.carFactory.CarType;
 
 public class CarRepository {
 
@@ -19,13 +21,13 @@ public class CarRepository {
 
     /**
      * 모든 차량 로드 (DB → Car 객체)
-     * 스키마 assumed: id, type, status, dailyrentalfee
+     * 스키마 assumed: id, type, status, dailyrentalfee, name
      */
     public List<Car> findAllCars() {
         List<Car> cars = new ArrayList<>();
 
-        // 컬럼명 dailyrentalfee로 수정
-        String sql = "SELECT id, type, status, dailyrentalfee FROM car";
+        // 컬럼명 dailyrentalfee로 수정, name 컬럼 추가
+        String sql = "SELECT id, type, status, dailyrentalfee, name FROM car";
 
         try (Connection conn = db.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql);
@@ -35,13 +37,26 @@ public class CarRepository {
                 String id = rs.getString("id");
                 String type = rs.getString("type");
                 String status = rs.getString("status");
-
-                // dailyrentalfee 컬럼은 SELECT에 포함하지만 팩토리에서 하드코딩하므로 여기서는 사용하지 않음
-                // 예시: double fee = rs.getDouble("dailyrentalfee");
+                String name = rs.getString("name");
+                BigDecimal dailyRentalFee = rs.getBigDecimal("dailyrentalfee");
 
                 // 팩토리에서 차량 생성
                 CarFactory factory = CarFactoryProvider.getFactory(type);
                 Car car = factory.createCar(id);
+                
+                // 일일 대여료 설정 (DB에서 읽은 값이 null이면 타입의 기본 요금 사용)
+                if (dailyRentalFee != null) {
+                    car.setDailyRentalFee(dailyRentalFee);
+                } else {
+                    // 타입의 기본 요금 사용
+                    CarType carType = CarType.valueOf(type);
+                    car.setDailyRentalFee(carType.baseRate());
+                }
+                
+                // 이름 설정 (name이 null이면 id 사용)
+                if (name != null && !name.trim().isEmpty()) {
+                    car.setName(name);
+                }
 
                 // 상태 반영
                 if ("UNAVAILABLE".equalsIgnoreCase(status)) {
@@ -83,7 +98,7 @@ public class CarRepository {
      * 차량 1대 조회
      */
     public Car findById(String carId) {
-        String sql = "SELECT id, type, status, dailyrentalfee FROM car WHERE id=?";
+        String sql = "SELECT id, type, status, dailyrentalfee, name FROM car WHERE id=?";
 
         try (Connection conn = db.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
@@ -96,11 +111,25 @@ public class CarRepository {
                 String id = rs.getString("id");
                 String type = rs.getString("type");
                 String status = rs.getString("status");
-
-                // 필요하면 요금 읽을 수 있음: double fee = rs.getDouble("dailyrentalfee");
+                String name = rs.getString("name");
+                BigDecimal dailyRentalFee = rs.getBigDecimal("dailyrentalfee");
 
                 CarFactory factory = CarFactoryProvider.getFactory(type);
                 Car car = factory.createCar(id);
+                
+                // 일일 대여료 설정 (DB에서 읽은 값이 null이면 타입의 기본 요금 사용)
+                if (dailyRentalFee != null) {
+                    car.setDailyRentalFee(dailyRentalFee);
+                } else {
+                    // 타입의 기본 요금 사용
+                    CarType carType = CarType.valueOf(type);
+                    car.setDailyRentalFee(carType.baseRate());
+                }
+                
+                // 이름 설정 (name이 null이면 id 사용)
+                if (name != null && !name.trim().isEmpty()) {
+                    car.setName(name);
+                }
 
                 if ("UNAVAILABLE".equalsIgnoreCase(status)) {
                     car.occupy();

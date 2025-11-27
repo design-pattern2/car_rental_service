@@ -98,7 +98,7 @@ public class Main {
             
             Thread.sleep(300);
             
-            String message2 = "   회원 인증을 해주세요!";
+            String message2 = "   먼저 회원 인증을 해주세요!";
             typeWriter(message2, 100);
             System.out.println();
             
@@ -108,7 +108,7 @@ public class Main {
             // 인터럽트 발생 시 그냥 메시지만 표시
             System.out.println("\n" + "=".repeat(50));
             System.out.println("   어서오세요 차량 렌트 시스템입니다.");
-            System.out.println("   회원 인증을 해주세요!");
+            System.out.println("   먼저 회원 인증을 해주세요!");
             System.out.println("=".repeat(50));
         }
     }
@@ -219,7 +219,7 @@ public class Main {
 
     private static void displayPostLoginMenu() {
         System.out.println("\n" + "-".repeat(40));
-        System.out.println("👤 [" + loggedInUser.getUserId() + "님] 회원 관리 시스템 메뉴");
+        System.out.println("👤 [" + loggedInUser.getName() + "님] 회원 관리 시스템 메뉴");
         System.out.println("-".repeat(40));
         System.out.println(" 1. 정보 조회 ");
         System.out.println(" 2. 정보 수정 ");
@@ -229,7 +229,7 @@ public class Main {
         System.out.println(" 6. 빌릴 수 있는 차량 조회 ");
         System.out.println(" 7. 차량 대여 ");
         System.out.println(" 8. 차량 반납 ");
-        System.out.println(" 9. 결제 ");
+        System.out.println(" 9. 결제 금액 확인 ");
         System.out.println(" 10. 로그아웃 ");
         System.out.println(" 0. 종료");
         System.out.println("-".repeat(40));
@@ -246,7 +246,7 @@ public class Main {
                 System.out.print("이름: "); String name = scanner.nextLine();
                 System.out.print("전화번호 (010...): "); String phone = scanner.nextLine();
                 us.signUp(id, pw, name, phone);
-                System.out.println("✅ 회원가입이 완료되었습니다! (" + id + ")");
+                System.out.println("✅ " + name + "님 회원가입이 완료되었습니다!");
                 break;
 
             case 2: // 관리자 회원가입
@@ -268,7 +268,7 @@ public class Main {
                     }
                     // 일반 회원가입과 동일하게 처리 (ID가 'admin'이면 관리자 권한)
                     User adminUser = us.signUp(id, pw, name, phone);
-                    System.out.println("✅ 관리자 회원가입이 완료되었습니다! (" + adminUser.getUserId() + ")");
+                    System.out.println("✅ " + adminUser.getName() + "님 관리자 회원가입이 완료되었습니다!");
                 } catch (IllegalArgumentException e) {
                     System.err.println("❌ " + e.getMessage());
                 } catch (IllegalStateException e) {
@@ -330,7 +330,9 @@ public class Main {
                 String feeInput = scanner.nextLine().trim();
                 BigDecimal fee = feeInput.isEmpty() ? null : new BigDecimal(feeInput);
                 
-                adminService.addCar(carName, type, fee);
+                // 차량 ID는 자동 생성되거나 이름을 기반으로 생성 (현재는 이름을 ID로 사용)
+                // TODO: 차량 ID를 별도로 입력받도록 변경 가능
+                adminService.addCar(carName, type, fee, carName);
                 break;
                 
             case 2: // 차량 삭제
@@ -375,8 +377,11 @@ public class Main {
                         user -> {
                             // ⭐️ 업데이트된 정보를 반영하기 위해 loggedInUser 갱신
                             loggedInUser = user;
-                            System.out.println("✅ 사용자 정보 조회 성공:");
-                            System.out.println(user);
+                            System.out.println("✅ " + user.getName() + "님의 정보는 다음과 같습니다.");
+                            System.out.println("ID: " + user.getUserId());
+                            System.out.println("이름: " + user.getName());
+                            System.out.println("전화번호: " + user.getPhoneNumber());
+                            System.out.println("등급: " + user.getUserMembershipStrategy().name());
                         },
                         () -> System.err.println("❌ 사용자 정보를 찾을 수 없습니다. (내부 오류)")
                 );
@@ -422,10 +427,21 @@ public class Main {
 
             case 5: // 회원 탈퇴
                 System.out.println("\n[5. 회원 탈퇴]");
-                us.withdraw(currentId);
-                System.out.println("✅ 회원 탈퇴가 완료되었습니다. (" + currentId + ")");
-                loggedInUser = null; // ⭐️ 탈퇴 후 로그아웃 처리
-                isAdmin = false;
+                System.out.println("⚠️  정말 회원 탈퇴를 하시겠습니까? (yes/no)");
+                System.out.print("선택: ");
+                String confirm = scanner.nextLine().trim().toLowerCase();
+                if ("yes".equals(confirm)) {
+                    // 탈퇴 전에 이름 저장
+                    String userName = loggedInUser != null ? loggedInUser.getName() : currentId;
+                    us.withdraw(currentId);
+                    System.out.println("✅ " + userName + "님 회원 탈퇴가 완료되었습니다.");
+                    loggedInUser = null; // ⭐️ 탈퇴 후 로그아웃 처리
+                    isAdmin = false;
+                } else if ("no".equals(confirm)) {
+                    System.out.println("❌ 회원 탈퇴가 취소되었습니다.");
+                } else {
+                    System.err.println("❌ 'yes' 또는 'no'를 입력해주세요.");
+                }
                 break;
                 
             case 6: // 빌릴 수 있는 차량 조회
@@ -443,8 +459,8 @@ public class Main {
                     for (int i = 0; i < availableCars.size(); i++) {
                         Car car = availableCars.get(i);
                         BigDecimal fee = car.getDailyRentalFee() != null ? car.getDailyRentalFee() : car.type().baseRate();
-                        System.out.printf("%d. [%s] %s (ID: %s) | 일일 요금: %s원%n", 
-                            i + 1, car.type(), car.id(), car.id(), formatMoney(fee));
+                        System.out.printf("%d. [%s] %s | 일일 요금: %s원%n", 
+                            i + 1, car.type(), car.getName(), formatMoney(fee));
                     }
                     System.out.println("-".repeat(60));
                 }
@@ -479,18 +495,18 @@ public class Main {
                 for (int i = 0; i < cars.size(); i++) {
                     Car car = cars.get(i);
                     BigDecimal fee = car.getDailyRentalFee() != null ? car.getDailyRentalFee() : car.type().baseRate();
-                    System.out.printf("%d. %s (ID: %s) | 일일 요금: %s원%n", 
-                        i + 1, car.id(), car.id(), formatMoney(fee));
+                    System.out.printf("%d. %s | 일일 요금: %s원%n", 
+                        i + 1, car.getName(), formatMoney(fee));
                 }
                 
-                // 3) 차량 ID로 선택
-                System.out.print("\n대여할 차량 ID 입력: ");
-                String carId = scanner.nextLine().trim();
+                // 3) 차량 이름으로 선택
+                System.out.print("\n대여할 차량 이름 입력: ");
+                String carName = scanner.nextLine().trim();
                 Optional<Car> carOpt = cars.stream()
-                    .filter(car -> car.id().equals(carId))
+                    .filter(car -> car.getName().equals(carName))
                     .findFirst();
                 if (carOpt.isEmpty()) {
-                    System.err.println("❌ 해당 ID의 차량을 찾을 수 없습니다.");
+                    System.err.println("❌ 해당 이름의 차량을 찾을 수 없습니다.");
                     break;
                 }
                 Car selectedCar = carOpt.get();
@@ -653,34 +669,91 @@ public class Main {
                 
             case 8: // 차량 반납
                 System.out.println("\n[8. 차량 반납]");
-                System.out.print("반납할 대여 ID: ");
-                long rentalId = Long.parseLong(scanner.nextLine());
                 
-                // 메모리에서 대여 시 생성된 RentalRecord 조회 (정보 유지)
-                RentalRecord cachedRecord = rentalRecordCache.get(rentalId);
-                if (cachedRecord == null) {
-                    // 메모리에 없으면 DB에서 조회 (하지만 정보가 불완전할 수 있음)
-                    RentalRepository rentalRepo = new RentalRepository(new DBConnection());
-                    Optional<RentalRecord> recordOpt = rentalRepo.findById(rentalId);
-                    if (recordOpt.isEmpty()) {
-                        System.err.println("❌ 대여 기록을 찾을 수 없습니다.");
+                // 1) 현재 사용자의 렌트 중인 차량 목록 조회
+                User currentUser = us.getUserInfo(currentId)
+                        .orElseThrow(() -> new IllegalArgumentException("사용자를 찾을 수 없습니다."));
+                int userPk = currentUser.getId();
+                
+                RentalRepository rentalRepo = new RentalRepository(new DBConnection());
+                List<RentalRecord> activeRentals = rentalRepo.findActiveByUserId(userPk);
+                
+                if (activeRentals.isEmpty()) {
+                    System.out.println("❌ 현재 대여 중인 차량이 없습니다.");
+                    break;
+                }
+                
+                // 2) 렌트 중인 차량 목록 표시
+                System.out.println("\n현재 대여 중인 차량 목록:");
+                System.out.println("-".repeat(60));
+                List<RentalRecord> validRecords = new ArrayList<>();
+                for (int i = 0; i < activeRentals.size(); i++) {
+                    RentalRecord record = activeRentals.get(i);
+                    // 메모리 캐시에서 정보 가져오기 (없으면 DB에서 가져온 것 사용)
+                    RentalRecord cachedRecord = rentalRecordCache.get(record.getId());
+                    if (cachedRecord != null) {
+                        record = cachedRecord; // 캐시된 정보 사용 (baseFee, optionFee 등 포함)
+                    }
+                    
+                    String carIdStr = record.getCarId();
+                    Car car = carRepository.findById(carIdStr);
+                    if (car == null) {
+                        continue; // 차량을 찾을 수 없으면 건너뛰기
+                    }
+                    
+                    String displayCarName = car.getName();
+                    String startDate = record.getStartAt() != null ? 
+                            record.getStartAt().format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd")) : 
+                            "알 수 없음";
+                    
+                    System.out.printf("%d. %s | 대여일: %s%n", i + 1, displayCarName, startDate);
+                    validRecords.add(record);
+                }
+                System.out.println("-".repeat(60));
+                
+                if (validRecords.isEmpty()) {
+                    System.err.println("❌ 반납 가능한 차량이 없습니다.");
+                    break;
+                }
+                
+                // 3) 차량 이름으로 반납할 차량 선택
+                System.out.print("\n반납할 차량 이름 입력: ");
+                String returnCarName = scanner.nextLine().trim();
+                
+                // 차량 이름으로 대여 기록 찾기
+                RentalRecord selectedRecord = null;
+                Car returnCar = null;
+                for (RentalRecord record : validRecords) {
+                    String carIdStr = record.getCarId();
+                    Car car = carRepository.findById(carIdStr);
+                    if (car != null && car.getName().equals(returnCarName)) {
+                        // 먼저 캐시에서 정보 가져오기 (baseFee, optionFee 포함)
+                        RentalRecord cachedRecord = rentalRecordCache.get(record.getId());
+                        if (cachedRecord != null) {
+                            selectedRecord = cachedRecord; // 캐시된 정보 사용 (baseFee, optionFee 포함)
+                        } else {
+                            selectedRecord = record; // 캐시가 없으면 DB에서 가져온 것 사용
+                        }
+                        returnCar = car;
                         break;
                     }
-                    cachedRecord = recordOpt.get();
                 }
                 
-                if (!currentId.equals(cachedRecord.getUserId())) {
-                    System.err.println("❌ 본인의 대여 기록만 반납할 수 있습니다.");
+                if (selectedRecord == null || returnCar == null) {
+                    System.err.println("❌ 해당 이름의 대여 중인 차량을 찾을 수 없습니다.");
                     break;
                 }
                 
-                // 차량 조회
-                String carIdStr = cachedRecord.getCarId();
-                Car returnCar = carRepository.findById(carIdStr);
-                if (returnCar == null) {
-                    System.err.println("❌ 차량 정보를 찾을 수 없습니다.");
-                    break;
+                // baseFee와 optionFee가 0이면 캐시에서 다시 확인
+                if ((selectedRecord.getBaseFee() == null || selectedRecord.getBaseFee().compareTo(BigDecimal.ZERO) == 0) &&
+                    (selectedRecord.getOptionFee() == null || selectedRecord.getOptionFee().compareTo(BigDecimal.ZERO) == 0)) {
+                    RentalRecord cachedRecordForReturn = rentalRecordCache.get(selectedRecord.getId());
+                    if (cachedRecordForReturn != null) {
+                        selectedRecord = cachedRecordForReturn; // 캐시된 정보 사용
+                    }
                 }
+                
+                long rentalId = selectedRecord.getId();
                 
                 try {
                     // 반납 전 사용자 등급 저장
@@ -688,36 +761,14 @@ public class Main {
                             .orElseThrow(() -> new IllegalArgumentException("사용자를 찾을 수 없습니다."));
                     String membershipBefore = userBeforeReturn.getUserMembershipStrategy().getClass().getSimpleName();
                     
-                    // 반납 전에 대여 시 저장된 baseFee와 optionFee를 미리 저장 (RentalService에서 수정되기 전)
-                    BigDecimal originalBaseFee = cachedRecord.getBaseFee();
-                    BigDecimal originalOptionFee = cachedRecord.getOptionFee();
+                    // 반납 실행 (캐시된 레코드 전달하여 baseFee, optionFee 유지)
+                    // selectedRecord는 이미 캐시에서 가져온 정보이므로 baseFee, optionFee가 포함되어 있음
+                    rentalService.returnCar(rentalId, returnCar, selectedRecord);
                     
-                    // 반납 실행 (RentalService.returnCar는 long, Car만 받음)
-                    rentalService.returnCar(rentalId, returnCar);
-                    
-                    // 반납 후 DB에서 다시 조회하여 업데이트된 정보 가져오기
-                    RentalRepository rentalRepo = new RentalRepository(new DBConnection());
-                    Optional<RentalRecord> returnedRecordOpt = rentalRepo.findById(rentalId);
-                    RentalRecord returnedRecord = returnedRecordOpt.orElse(cachedRecord);
-                    
-                    // 디버깅: 반납 후 cachedRecord 값 확인
-                    // System.out.println("DEBUG: after returnCar cachedRecord baseFee=" + cachedRecord.getBaseFee() + ", optionFee=" + cachedRecord.getOptionFee());
-                    
-                    // 반납 후 업데이트된 정보로 캐시 업데이트
-                    // 대여 시 정보(baseFee, optionFee, feeStrategyType, options)는 유지
-                    // 반납 시 계산된 penalty, discount, totalFee는 업데이트
-                    // ⚠️ 중요: returnedRecord는 새로운 객체이므로 cachedRecord를 직접 수정하지 않음
-                    // 대신 returnedRecord에 cachedRecord의 baseFee와 optionFee를 복사
-                    returnedRecord.setBaseFee(cachedRecord.getBaseFee());
-                    returnedRecord.setOptionFee(cachedRecord.getOptionFee());
-                    returnedRecord.setFeeStrategyType(cachedRecord.getFeeStrategyType());
-                    returnedRecord.setOptions(new ArrayList<>(cachedRecord.getOptions()));
-                    // 캐시도 업데이트
-                    cachedRecord.setPenalty(returnedRecord.getPenalty());
-                    cachedRecord.setDiscount(returnedRecord.getDiscount());
-                    cachedRecord.setTotalFee(returnedRecord.getTotalFee());
-                    cachedRecord.setEndAt(returnedRecord.getEndAt());
-                    cachedRecord.setStatus(returnedRecord.getStatus());
+                    // 반납 후 selectedRecord가 이미 업데이트됨 (penalty, discount, totalFee 포함)
+                    // baseFee, optionFee는 유지됨
+                    // 하지만 discount와 totalFee는 RentalService에서 계산된 값이므로 다시 가져와야 함
+                    // selectedRecord는 이미 업데이트되었으므로 그대로 사용
                     
                     // 차량 상태를 DB에 업데이트 (AVAILABLE로 변경)
                     returnCar.release();
@@ -727,19 +778,15 @@ public class Main {
                     System.out.println("\n반납 요금은 다음과 같습니다:\n");
                     
                     // 요금 명세서 출력 (대여 시와 동일한 형식)
-                    // 대여 시 저장된 정보 사용
+                    // selectedRecord는 이미 반납 후 업데이트됨 (penalty, discount, totalFee 포함)
                     BigDecimal dailyFee = returnCar.getDailyRentalFee() != null ? 
                                          returnCar.getDailyRentalFee() : 
                                          returnCar.type().baseRate();
-                    int returnRentalDays = returnedRecord.getRentalDays();
-                    
-                    // 대여 시 저장된 baseFee와 optionFee 사용 (반납 전에 미리 저장한 원본 값)
-                    BigDecimal baseFee = originalBaseFee;
-                    BigDecimal optionFee = originalOptionFee;
+                    int returnRentalDays = selectedRecord.getRentalDays();
                     
                     // 요금 정책 재구성 (명세서 출력용)
                     FeeStrategy returnFeeStrategy;
-                    String feeStrategyType = returnedRecord.getFeeStrategyType();
+                    String feeStrategyType = selectedRecord.getFeeStrategyType();
                     if (feeStrategyType == null || feeStrategyType.isEmpty()) {
                         returnFeeStrategy = new BaseFeeStrategy();
                     } else if ("PeakSeasonFeeStrategy".equals(feeStrategyType)) {
@@ -750,10 +797,12 @@ public class Main {
                         returnFeeStrategy = new BaseFeeStrategy();
                     }
                     
+                    // baseFee는 요금 정책을 사용하여 재계산 (대여 시와 동일하게)
+                    // selectedRecord의 baseFee가 잘못 저장되었을 수 있으므로 항상 재계산
+                    BigDecimal baseFee = returnFeeStrategy.calculateTotalFee(returnCar, returnRentalDays);
+                    
                     // 정책 적용 전 기본 요금 (명세서 출력용)
                     BigDecimal baseFeeBeforePolicy = dailyFee.multiply(new BigDecimal(returnRentalDays));
-                    // 요금 정책 적용 금액 (할인/할증)
-                    BigDecimal policyAdjustment = baseFee.subtract(baseFeeBeforePolicy);
                     String policyDescription = "";
                     if (returnFeeStrategy instanceof PeakSeasonFeeStrategy) {
                         policyDescription = " (20% 할증)";
@@ -763,7 +812,7 @@ public class Main {
                     
                     // 옵션 비용 계산 (대여 시 저장된 옵션 정보 사용)
                     Map<String, BigDecimal> optionCosts = new HashMap<>();
-                    List<String> returnOptions = returnedRecord.getOptions();
+                    List<String> returnOptions = selectedRecord.getOptions();
                     if (returnOptions != null && !returnOptions.isEmpty()) {
                         for (String option : returnOptions) {
                             BigDecimal optionDailyCost = switch (option) {
@@ -778,28 +827,25 @@ public class Main {
                     }
                     
                     // 연체 패널티
-                    BigDecimal penalty = returnedRecord.getPenalty();
+                    BigDecimal penalty = selectedRecord.getPenalty() != null ? selectedRecord.getPenalty() : BigDecimal.ZERO;
                     
-                    // 회원 등급 할인
-                    BigDecimal discount = returnedRecord.getDiscount();
-                    
-                    // 최종 요금
-                    BigDecimal totalFee = returnedRecord.getTotalFee();
-                    
-                    // 요금 계산 과정 출력 (더 이해하기 쉽게)
+                    // 요금 계산 과정 출력 (대여 시와 동일한 형식)
                     System.out.println("--- [반납 요금 계산 내역] ---");
-                    System.out.printf("차량: %s (%s)%n", returnCar.id(), returnCar.type());
+                    System.out.printf("차량: %s (%s)%n", returnCar.getName(), returnCar.type());
                     System.out.printf("차량 일일 요금: %s원%n", formatMoney(dailyFee));
                     System.out.printf("대여 일수: %d일%n", returnRentalDays);
                     System.out.printf("요금 정책: %s%s%n", returnFeeStrategy.getClass().getSimpleName(), policyDescription);
                     
-                    // 옵션 표시
+                    // 옵션 표시 (대여 시와 동일한 형식)
                     if (!optionCosts.isEmpty()) {
                         System.out.print("옵션: ");
                         List<String> optionNames = new ArrayList<>(optionCosts.keySet());
                         for (int i = 0; i < optionNames.size(); i++) {
                             if (i > 0) System.out.print(", ");
-                            System.out.print(optionNames.get(i));
+                            String optionName = optionNames.get(i);
+                            BigDecimal optionTotal = optionCosts.get(optionName);
+                            BigDecimal optionDaily = optionTotal.divide(new BigDecimal(returnRentalDays));
+                            System.out.printf("%s (%s원/일)", optionName, formatMoney(optionDaily));
                         }
                         System.out.println();
                     } else {
@@ -807,14 +853,44 @@ public class Main {
                     }
                     System.out.println();
                     
-                    // 대여 시 요금 계산 (대여 시 저장된 baseFee + optionFee 사용)
-                    // baseFee는 이미 정책이 적용된 값이므로 그대로 사용
-                    BigDecimal rentalFee = baseFee.add(optionFee);
-                    if (penalty.compareTo(BigDecimal.ZERO) > 0) {
-                        rentalFee = rentalFee.add(penalty);
+                    // 간단한 계산식 출력 (대여 시와 동일한 형식)
+                    String policyPercent = "";
+                    if (returnFeeStrategy instanceof PeakSeasonFeeStrategy) {
+                        policyPercent = " × 120%";
+                    } else if (returnFeeStrategy instanceof OffSeasonFeeStrategy) {
+                        policyPercent = " × 90%";
                     }
                     
+                    // 옵션 비용 계산 (optionCosts에서 계산한 값 사용 - 대여 시와 동일하게 계산)
+                    BigDecimal totalOptionCost = BigDecimal.ZERO;
+                    if (!optionCosts.isEmpty()) {
+                        for (BigDecimal cost : optionCosts.values()) {
+                            totalOptionCost = totalOptionCost.add(cost);
+                        }
+                    }
+                    // optionCosts가 비어있고 optionFee가 있으면 optionFee 사용 (옵션이 없는 경우)
+                    // 하지만 optionCosts에서 계산한 값이 더 정확하므로 우선 사용
+                    
+                    // 계산식: (일일요금 × 일수) × 정책 + 옵션비용 = baseFee + totalOptionCost
+                    // baseFee는 이미 정책이 적용된 값이므로 그대로 사용
+                    BigDecimal calculatedTotal = baseFee.add(totalOptionCost);
+                    System.out.printf("(%s원 × %d일)%s + %s원 = %s원%n",
+                        formatMoney(dailyFee), returnRentalDays, policyPercent, 
+                        formatMoney(totalOptionCost), formatMoney(calculatedTotal));
+                    System.out.println();
+                    
+                    // 대여 시 요금 계산 (계산식과 동일하게 baseFee + totalOptionCost 사용)
+                    // penalty는 대여 시 요금에 포함하지 않음 (반납 시 추가되는 것)
+                    BigDecimal rentalFee = calculatedTotal;
                     System.out.printf("대여 시 요금: %s원%n", formatMoney(rentalFee));
+                    
+                    // 회원 등급 할인 재계산 (대여 시 요금에만 적용, penalty 제외)
+                    // rentalFee = baseFee + totalOptionCost (penalty 제외)
+                    BigDecimal discountedAmount = userBeforeReturn.applyDiscount(rentalFee);
+                    BigDecimal discount = rentalFee.subtract(discountedAmount);
+                    
+                    // 최종 결제 금액 = 할인된 대여 시 요금 + penalty
+                    BigDecimal totalFee = discountedAmount.add(penalty);
                     
                     // 회원 등급 할인 (등급 표시 포함) - 반납 전 등급 사용
                     String membershipName = userBeforeReturn.getUserMembershipStrategy().getClass().getSimpleName();
@@ -846,45 +922,188 @@ public class Main {
                 }
                 break;
                 
-            case 9: // 결제
-                System.out.println("\n[9. 결제]");
-                System.out.print("결제할 대여 ID: ");
-                long paymentRentalId = Long.parseLong(scanner.nextLine());
+            case 9: // 결제 금액 확인
+                System.out.println("\n[9. 결제 금액 확인]");
                 
-                // 대여 기록 조회
+                // 1) 현재 사용자의 렌트 중인 차량 목록 조회
+                User currentUserForPayment = us.getUserInfo(currentId)
+                        .orElseThrow(() -> new IllegalArgumentException("사용자를 찾을 수 없습니다."));
+                int userPkForPayment = currentUserForPayment.getId();
+                
                 RentalRepository paymentRentalRepo = new RentalRepository(new DBConnection());
-                Optional<RentalRecord> paymentRecordOpt = paymentRentalRepo.findById(paymentRentalId);
-                if (paymentRecordOpt.isEmpty()) {
-                    System.err.println("❌ 대여 기록을 찾을 수 없습니다.");
+                List<RentalRecord> activeRentalsForPayment = paymentRentalRepo.findActiveByUserId(userPkForPayment);
+                
+                if (activeRentalsForPayment.isEmpty()) {
+                    System.out.println("❌ 현재 대여 중인 차량이 없습니다.");
                     break;
                 }
                 
-                RentalRecord paymentRecord = paymentRecordOpt.get();
-                if (!currentId.equals(paymentRecord.getUserId())) {
-                    System.err.println("❌ 본인의 대여 기록만 결제할 수 있습니다.");
+                // 2) 렌트 중인 차량 목록 표시
+                System.out.println("\n현재 대여 중인 차량 목록:");
+                System.out.println("-".repeat(60));
+                List<RentalRecord> validRecordsForPayment = new ArrayList<>();
+                for (int i = 0; i < activeRentalsForPayment.size(); i++) {
+                    RentalRecord record = activeRentalsForPayment.get(i);
+                    // 메모리 캐시에서 정보 가져오기 (없으면 DB에서 가져온 것 사용)
+                    RentalRecord cachedRecord = rentalRecordCache.get(record.getId());
+                    if (cachedRecord != null) {
+                        record = cachedRecord; // 캐시된 정보 사용 (baseFee, optionFee 등 포함)
+                    }
+                    
+                    String carIdStr = record.getCarId();
+                    Car car = carRepository.findById(carIdStr);
+                    if (car == null) {
+                        continue; // 차량을 찾을 수 없으면 건너뛰기
+                    }
+                    
+                    String displayCarName = car.getName();
+                    String startDate = record.getStartAt() != null ? 
+                            record.getStartAt().format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd")) : 
+                            "알 수 없음";
+                    
+                    System.out.printf("%d. %s | 대여일: %s%n", i + 1, displayCarName, startDate);
+                    validRecordsForPayment.add(record);
+                }
+                System.out.println("-".repeat(60));
+                
+                if (validRecordsForPayment.isEmpty()) {
+                    System.err.println("❌ 확인 가능한 차량이 없습니다.");
                     break;
                 }
                 
-                // 차량 조회
-                String paymentCarId = paymentRecord.getCarId();
-                Car paymentCar = carRepository.findById(paymentCarId);
-                if (paymentCar == null) {
-                    System.err.println("❌ 차량 정보를 찾을 수 없습니다.");
+                // 3) 차량 이름으로 확인할 차량 선택
+                System.out.print("\n결제 금액을 확인할 차량 이름 입력: ");
+                String paymentCarName = scanner.nextLine().trim();
+                
+                // 차량 이름으로 대여 기록 찾기
+                RentalRecord selectedRecordForPayment = null;
+                Car paymentCar = null;
+                for (RentalRecord record : validRecordsForPayment) {
+                    String carIdStr = record.getCarId();
+                    Car car = carRepository.findById(carIdStr);
+                    if (car != null && car.getName().equals(paymentCarName)) {
+                        // 먼저 캐시에서 정보 가져오기 (baseFee, optionFee 포함)
+                        RentalRecord cachedRecord = rentalRecordCache.get(record.getId());
+                        if (cachedRecord != null) {
+                            selectedRecordForPayment = cachedRecord; // 캐시된 정보 사용 (baseFee, optionFee 포함)
+                        } else {
+                            selectedRecordForPayment = record; // 캐시가 없으면 DB에서 가져온 것 사용
+                        }
+                        paymentCar = car;
+                        break;
+                    }
+                }
+                
+                if (selectedRecordForPayment == null || paymentCar == null) {
+                    System.err.println("❌ 해당 이름의 대여 중인 차량을 찾을 수 없습니다.");
                     break;
                 }
                 
-                // 옵션 데코레이터 재구성 (간단화)
-                FeeStrategy paymentFeeStrategy = new BaseFeeStrategy(); // 기본값
-                // TODO: RentalComponent 재구성 필요
+                // baseFee와 optionFee가 0이면 캐시에서 다시 확인
+                if ((selectedRecordForPayment.getBaseFee() == null || selectedRecordForPayment.getBaseFee().compareTo(BigDecimal.ZERO) == 0) &&
+                    (selectedRecordForPayment.getOptionFee() == null || selectedRecordForPayment.getOptionFee().compareTo(BigDecimal.ZERO) == 0)) {
+                    RentalRecord cachedRecordForPayment = rentalRecordCache.get(selectedRecordForPayment.getId());
+                    if (cachedRecordForPayment != null) {
+                        selectedRecordForPayment = cachedRecordForPayment; // 캐시된 정보 사용
+                    }
+                }
                 
                 try {
-                    // PaymentService의 processPayment는 RentalComponent를 요구하므로
-                    // 임시로 간단한 처리
-                    System.out.println("⚠️ 결제 기능은 대여 시 자동으로 처리됩니다.");
-                    System.out.println("대여 ID: " + paymentRecord.getId());
-                    System.out.println("예상 총액: " + formatMoney(paymentRecord.getTotalFee()) + "원");
+                    // 대여 시 청구한 금액 표시 (대여 시와 동일한 형식)
+                    BigDecimal dailyFee = paymentCar.getDailyRentalFee() != null ? 
+                                         paymentCar.getDailyRentalFee() : 
+                                         paymentCar.type().baseRate();
+                    int paymentRentalDays = selectedRecordForPayment.getRentalDays();
+                    
+                    // 요금 정책 재구성
+                    FeeStrategy paymentFeeStrategy;
+                    String feeStrategyType = selectedRecordForPayment.getFeeStrategyType();
+                    if (feeStrategyType == null || feeStrategyType.isEmpty()) {
+                        paymentFeeStrategy = new BaseFeeStrategy();
+                    } else if ("PeakSeasonFeeStrategy".equals(feeStrategyType)) {
+                        paymentFeeStrategy = new PeakSeasonFeeStrategy();
+                    } else if ("OffSeasonFeeStrategy".equals(feeStrategyType)) {
+                        paymentFeeStrategy = new OffSeasonFeeStrategy();
+                    } else {
+                        paymentFeeStrategy = new BaseFeeStrategy();
+                    }
+                    
+                    // baseFee 재계산 (대여 시와 동일하게)
+                    BigDecimal baseFee = paymentFeeStrategy.calculateTotalFee(paymentCar, paymentRentalDays);
+                    
+                    String policyDescription = "";
+                    if (paymentFeeStrategy instanceof PeakSeasonFeeStrategy) {
+                        policyDescription = " (20% 할증)";
+                    } else if (paymentFeeStrategy instanceof OffSeasonFeeStrategy) {
+                        policyDescription = " (10% 할인)";
+                    }
+                    
+                    // 옵션 비용 계산
+                    Map<String, BigDecimal> optionCosts = new HashMap<>();
+                    List<String> paymentOptions = selectedRecordForPayment.getOptions();
+                    if (paymentOptions != null && !paymentOptions.isEmpty()) {
+                        for (String option : paymentOptions) {
+                            BigDecimal optionDailyCost = switch (option) {
+                                case "Blackbox" -> new BigDecimal("5000");
+                                case "Navigation" -> new BigDecimal("7000");
+                                case "Sunroof" -> new BigDecimal("15000");
+                                default -> BigDecimal.ZERO;
+                            };
+                            BigDecimal optionTotal = optionDailyCost.multiply(new BigDecimal(paymentRentalDays));
+                            optionCosts.put(option, optionTotal);
+                        }
+                    }
+                    
+                    // 옵션 비용 합계
+                    BigDecimal totalOptionCost = BigDecimal.ZERO;
+                    if (!optionCosts.isEmpty()) {
+                        for (BigDecimal cost : optionCosts.values()) {
+                            totalOptionCost = totalOptionCost.add(cost);
+                        }
+                    }
+                    
+                    // 총 요금
+                    BigDecimal totalFee = baseFee.add(totalOptionCost);
+                    
+                    // 요금 계산 과정 출력 (대여 시와 동일한 형식)
+                    System.out.println("\n--- [요금 계산 내역] ---");
+                    System.out.printf("차량: %s (%s)%n", paymentCar.getName(), paymentCar.type());
+                    System.out.printf("차량 일일 요금: %s원%n", formatMoney(dailyFee));
+                    System.out.printf("대여 일수: %d일%n", paymentRentalDays);
+                    System.out.printf("요금 정책: %s%s%n", paymentFeeStrategy.getClass().getSimpleName(), policyDescription);
+                    
+                    // 옵션 표시 (가격 포함)
+                    if (!optionCosts.isEmpty()) {
+                        System.out.print("옵션: ");
+                        List<String> optionNames = new ArrayList<>(optionCosts.keySet());
+                        for (int i = 0; i < optionNames.size(); i++) {
+                            if (i > 0) System.out.print(", ");
+                            String optionName = optionNames.get(i);
+                            BigDecimal optionTotal = optionCosts.get(optionName);
+                            BigDecimal optionDaily = optionTotal.divide(new BigDecimal(paymentRentalDays));
+                            System.out.printf("%s (%s원/일)", optionName, formatMoney(optionDaily));
+                        }
+                        System.out.println();
+                    } else {
+                        System.out.println("옵션: 없음");
+                    }
+                    System.out.println();
+                    
+                    // 간단한 계산식 출력
+                    String policyPercent = "";
+                    if (paymentFeeStrategy instanceof PeakSeasonFeeStrategy) {
+                        policyPercent = " × 120%";
+                    } else if (paymentFeeStrategy instanceof OffSeasonFeeStrategy) {
+                        policyPercent = " × 90%";
+                    }
+                    
+                    System.out.printf("(%s원 × %d일)%s + %s원 = %s원%n",
+                        formatMoney(dailyFee), paymentRentalDays, policyPercent, 
+                        formatMoney(totalOptionCost), formatMoney(totalFee));
+                    System.out.println("-------------------\n");
+                    
                 } catch (Exception e) {
-                    System.err.println("❌ 결제 실패: " + e.getMessage());
+                    System.err.println("❌ 결제 금액 확인 실패: " + e.getMessage());
                 }
                 break;
 

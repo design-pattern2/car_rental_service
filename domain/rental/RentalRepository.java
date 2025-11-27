@@ -40,6 +40,20 @@ public class RentalRepository {
         return db.queryForObject(sql, Map.of("id", id)).map(this::mapRowToRecord);
     }
 
+    /** userId(INT PK) 기준으로 'RENTED' 상태인 활성 대여 목록 조회 */
+    public List<RentalRecord> findActiveByUserId(int userId) {
+        String sql =
+                "SELECT r.*, u.userId AS loginUserId " +
+                "FROM " + TBL + " r " +
+                "JOIN user u ON r.userId = u.id " +
+                "WHERE r.userId = :userId AND r.status = 'RENTED' " +
+                "ORDER BY r.startTime DESC";
+        return db.queryForList(sql, Map.of("userId", userId))
+                .stream()
+                .map(this::mapRowToRecord)
+                .collect(java.util.stream.Collectors.toList());
+    }
+
     /**
      * 대여 저장 (README의 rental 테이블)
      *  - startTime: now
@@ -80,7 +94,17 @@ public class RentalRepository {
 
         Object idObj = row.get("id");
         if (idObj != null) {
-            rec.setId(((Number) idObj).longValue());
+            // id가 Number인 경우와 String인 경우 모두 처리
+            if (idObj instanceof Number) {
+                rec.setId(((Number) idObj).longValue());
+            } else {
+                // String인 경우 파싱
+                try {
+                    rec.setId(Long.parseLong(String.valueOf(idObj)));
+                } catch (NumberFormatException e) {
+                    // 파싱 실패 시 무시
+                }
+            }
         }
 
         // loginUserId 별칭이 존재하면 로그인 아이디로 사용
@@ -91,13 +115,23 @@ public class RentalRepository {
             // loginUserId가 없으면 Fallback: 정수 FK 그대로 문자열로
             Object userIdObj = row.get("userId");
             if (userIdObj != null) {
-                rec.setUserId(String.valueOf(((Number) userIdObj).intValue()));
+                // userId가 Number인 경우와 String인 경우 모두 처리
+                if (userIdObj instanceof Number) {
+                    rec.setUserId(String.valueOf(((Number) userIdObj).intValue()));
+                } else {
+                    rec.setUserId(String.valueOf(userIdObj));
+                }
             }
         }
 
         Object carIdObj = row.get("carId");
         if (carIdObj != null) {
-            rec.setCarId(String.valueOf(((Number) carIdObj).intValue()));
+            // carId가 Number인 경우와 String인 경우 모두 처리
+            if (carIdObj instanceof Number) {
+                rec.setCarId(String.valueOf(((Number) carIdObj).intValue()));
+            } else {
+                rec.setCarId(String.valueOf(carIdObj));
+            }
         }
 
         LocalDateTime start = toLdt(row.get("startTime"));

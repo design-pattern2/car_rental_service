@@ -95,8 +95,9 @@ public class AdminService {
      *  - type            VARCHAR(20)   (SEDAN, SUV ...)
      *  - status          VARCHAR(20)   (AVAILABLE, UNAVAILABLE)
      *  - dailyRentalFee  DECIMAL(10,2)
+     *  - name            VARCHAR(100)  차량 이름
      */
-    public void addCar(String carId, CarType type, BigDecimal dailyRentalFee) {
+    public void addCar(String carId, CarType type, BigDecimal dailyRentalFee, String carName) {
         ensureAdminLoggedIn();
 
         if (carId == null || carId.isBlank()) {
@@ -113,21 +114,26 @@ public class AdminService {
 
         // 2) 요금 결정: null 이면 CarType 기본 요금 사용
         BigDecimal fee = (dailyRentalFee != null) ? dailyRentalFee : type.baseRate();
+        
+        // 3) 이름 결정: null이거나 비어있으면 carId 사용
+        String name = (carName != null && !carName.trim().isEmpty()) ? carName : carId;
 
         String insertSql =
                 "INSERT INTO " + CAR_TBL +
-                        " (id, type, status, dailyRentalFee) " +
-                        "VALUES (:id, :type, :status, :dailyRentalFee)";
+                        " (id, type, status, dailyRentalFee, name) " +
+                        "VALUES (:id, :type, :status, :dailyRentalFee, :name)";
 
         Map<String, Object> params = new HashMap<>();
         params.put("id", carId);
         params.put("type", type.name());
         params.put("status", CarStatus.AVAILABLE.name());
         params.put("dailyRentalFee", fee);
+        params.put("name", name);
 
         int rows = db.execute(insertSql, params);
         if (rows > 0) {
             System.out.println("[관리자] 차량 등록 완료 -> ID=" + carId +
+                    ", 이름=" + name +
                     ", 타입=" + type +
                     ", 1일 대여료=" + fee);
         } else {

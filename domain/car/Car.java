@@ -11,6 +11,7 @@ public class Car {
 	private final CarType type;
 	private CarStatus status;
     private BigDecimal dailyRentalFee;
+    private String name;
     
     
     public Car(String id, CarType type)
@@ -18,12 +19,24 @@ public class Car {
     	this.id = Objects.requireNonNull(id);
         this.type = Objects.requireNonNull(type);
         this.status = CarStatus.AVAILABLE;
+        this.name = id; // 기본값으로 id 사용
+    }
+    
+    public Car(String id, CarType type, String name)
+    {
+    	this.id = Objects.requireNonNull(id);
+        this.type = Objects.requireNonNull(type);
+        this.status = CarStatus.AVAILABLE;
+        this.name = name != null ? name : id;
     }
     
     public String id() { return id; }
     public CarType type() { return type; }
     public CarStatus status() { return status; }
     public BigDecimal getDailyRentalFee(){return dailyRentalFee;}
+    public void setDailyRentalFee(BigDecimal dailyRentalFee) { this.dailyRentalFee = dailyRentalFee; }
+    public String getName() { return name; }
+    public void setName(String name) { this.name = name != null ? name : this.id; }
     
     public void occupy() { this.status = CarStatus.UNAVAILABLE; }
     public void release() { this.status = CarStatus.AVAILABLE; }
