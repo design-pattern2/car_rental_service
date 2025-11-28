@@ -98,6 +98,14 @@ public class UserService {
     }
 
     // =================================================================
+    // 3-1. 이름으로 사용자 조회: findUserByName(String name)
+    // =================================================================
+    public Optional<User> findUserByName(String name) {
+        // 데이터 접근 위임: Repository의 findByName 메서드를 호출하여 User 객체 반환
+        return userRepository.findByName(name);
+    }
+
+    // =================================================================
     // 4. 정보 수정: updateUserInfo(userId, newName, newPassword)
     // =================================================================
     public User updateUserInfo(String userId, String newName, String newPassword, String newPhoneNumber) {

@@ -13,6 +13,7 @@ import main.command.receiver.ApplicationContext;
 import main.command.concretecommand.prelogin.SignUpCommand;
 import main.command.concretecommand.prelogin.AdminSignUpCommand;
 import main.command.concretecommand.prelogin.LoginCommand;
+import main.command.concretecommand.prelogin.FindAccountCommand;
 import main.command.concretecommand.user.*;
 import main.command.concretecommand.admin.*;
 
@@ -174,6 +175,7 @@ public class Main {
                 case 1 -> new SignUpCommand(context, scanner);
                 case 2 -> new AdminSignUpCommand(context, scanner);
                 case 3 -> new LoginCommand(context, scanner);
+                case 4 -> new FindAccountCommand(context, scanner);
                 default -> null;
             };
         } else {
@@ -184,12 +186,11 @@ public class Main {
                 return switch (menu) {
                     case 1 -> new ViewInfoCommand(context, scanner, true);
                     case 2 -> new UpdateInfoCommand(context, scanner);
-                    case 3 -> new ResetPasswordCommand(context, scanner);
-                    case 4 -> new RegisterCarCommand(context, scanner);
-                    case 5 -> new DeleteCarCommand(context, scanner);
-                    case 6 -> new ViewRentalRecordsCommand(context, scanner);
-                    case 7 -> new ChangeSeasonCommand(context, scanner);
-                    case 8 -> new LogoutCommand(context, scanner);
+                    case 3 -> new RegisterCarCommand(context, scanner);
+                    case 4 -> new DeleteCarCommand(context, scanner);
+                    case 5 -> new ViewRentalRecordsCommand(context, scanner);
+                    case 6 -> new ChangeSeasonCommand(context, scanner);
+                    case 7 -> new LogoutCommand(context, scanner);
                     default -> null;
                 };
             } else {
@@ -197,14 +198,13 @@ public class Main {
                 return switch (menu) {
                     case 1 -> new ViewInfoCommand(context, scanner, false);
                     case 2 -> new UpdateInfoCommand(context, scanner);
-                    case 3 -> new ResetPasswordCommand(context, scanner);
-                    case 4 -> new RegisterCardCommand(context, scanner);
-                    case 5 -> new WithdrawCommand(context, scanner);
-                    case 6 -> new ViewAvailableCarsCommand(context, scanner);
-                    case 7 -> new RentCarCommand(context, scanner);
-                    case 8 -> new ReturnCarCommand(context, scanner);
-                    case 9 -> new ViewPaymentCommand(context, scanner);
-                    case 10 -> new LogoutCommand(context, scanner);
+                    case 3 -> new RegisterCardCommand(context, scanner);
+                    case 4 -> new WithdrawCommand(context, scanner);
+                    case 5 -> new ViewAvailableCarsCommand(context, scanner);
+                    case 6 -> new RentCarCommand(context, scanner);
+                    case 7 -> new ReturnCarCommand(context, scanner);
+                    case 8 -> new ViewPaymentCommand(context, scanner);
+                    case 9 -> new LogoutCommand(context, scanner);
                     default -> null;
                 };
             }
@@ -218,6 +218,7 @@ public class Main {
         System.out.println(" 1. 회원가입 ");
         System.out.println(" 2. 관리자 회원가입 ");
         System.out.println(" 3. 로그인 (login)");
+        System.out.println(" 4. 회원정보 찾기");
         System.out.println(" 0. 종료");
         System.out.println("-".repeat(40));
     }
@@ -232,26 +233,24 @@ public class Main {
             // 관리자 메뉴
             System.out.println(" 1. 정보 조회 ");
             System.out.println(" 2. 정보 수정 ");
-            System.out.println(" 3. 비밀번호 재설정 ");
-            System.out.println(" 4. 차량 등록 ");
-            System.out.println(" 5. 차량 삭제 ");
-            System.out.println(" 6. 대여 기록 조회 ");
-            System.out.println(" 7. 시즌 변경 ");
-            System.out.println(" 8. 로그아웃 ");
-        System.out.println(" 0. 종료");
+            System.out.println(" 3. 차량 등록 ");
+            System.out.println(" 4. 차량 삭제 ");
+            System.out.println(" 5. 대여 기록 조회 ");
+            System.out.println(" 6. 시즌 변경 ");
+            System.out.println(" 7. 로그아웃 ");
+            System.out.println(" 0. 종료");
         } else {
             // 일반 사용자 메뉴
-        System.out.println(" 1. 정보 조회 ");
-        System.out.println(" 2. 정보 수정 ");
-        System.out.println(" 3. 비밀번호 재설정 ");
-        System.out.println(" 4. 카드 등록 ");
-        System.out.println(" 5. 회원 탈퇴 ");
-        System.out.println(" 6. 빌릴 수 있는 차량 조회 ");
-        System.out.println(" 7. 차량 대여 ");
-        System.out.println(" 8. 차량 반납 ");
-            System.out.println(" 9. 결제 금액 확인 ");
-        System.out.println(" 10. 로그아웃 ");
-        System.out.println(" 0. 종료");
+            System.out.println(" 1. 정보 조회 ");
+            System.out.println(" 2. 정보 수정 ");
+            System.out.println(" 3. 카드 등록 ");
+            System.out.println(" 4. 회원 탈퇴 ");
+            System.out.println(" 5. 빌릴 수 있는 차량 조회 ");
+            System.out.println(" 6. 차량 대여 ");
+            System.out.println(" 7. 차량 반납 ");
+            System.out.println(" 8. 결제 금액 확인 ");
+            System.out.println(" 9. 로그아웃 ");
+            System.out.println(" 0. 종료");
         }
         System.out.println("-".repeat(40));
     }
