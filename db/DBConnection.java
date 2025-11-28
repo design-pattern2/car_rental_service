@@ -7,11 +7,39 @@ import java.util.regex.Pattern;
 
 /**
  * DB 연결 및 SQL 실행을 전담하는 헬퍼 클래스 (DB 관리자 담당)
+ * Singleton Pattern 적용: 애플리케이션 전체에서 하나의 인스턴스만 생성하여 사용
  * 1. DB 연결 관리 (시스템 속성 'System.getProperty' 기반)
  * 2. 이름 기반 파라미터(:paramName)를 JDBC(? 기반)로 변환 및 실행
  * 3. 템플릿 메서드 제공 (execute, queryForObject, queryForList 등)
  */
 public class DBConnection {
+
+    // --- 싱글턴 패턴 구현 ---
+    
+    /**
+     * 싱글턴 인스턴스 (애플리케이션 전체에서 하나만 존재)
+     */
+    private static DBConnection instance;
+    
+    /**
+     * 싱글턴 인스턴스를 반환합니다.
+     * 최초 호출 시에만 인스턴스를 생성하고, 이후에는 동일한 인스턴스를 반환합니다.
+     * @return DBConnection 싱글턴 인스턴스
+     */
+    public static DBConnection getInstance() {
+        if (instance == null) {
+            instance = new DBConnection();
+        }
+        return instance;
+    }
+    
+    /**
+     * private 생성자: 외부에서 new DBConnection()으로 인스턴스 생성 불가
+     * getInstance()를 통해서만 인스턴스를 얻을 수 있습니다.
+     */
+    private DBConnection() {
+        // 생성자 내부는 비워둡니다 (초기화는 static 블록에서 수행)
+    }
 
     // --- 1. DB 연결 설정 (시스템 속성 사용) ---
 

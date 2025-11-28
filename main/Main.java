@@ -36,7 +36,7 @@ public class Main {
              Scanner scanner = new Scanner(System.in)) {
             System.out.println("✅ DB 연결 완료");
             
-            DBConnection db = new DBConnection();
+            DBConnection db = DBConnection.getInstance();
             UserService userService = new UserService(new UserRepository(db));
             AdminService adminService = new AdminService(db, userService);
             CarRepository carRepository = new CarRepository(db);
