@@ -1,4 +1,4 @@
-package domain.payment.strategy;
+package domain.rental.strategy;
 
 import domain.car.Car;
 
@@ -18,3 +18,4 @@ public interface FeeStrategy {
      */
     BigDecimal calculateTotalFee(Car car, int rentalDays);
 }
+

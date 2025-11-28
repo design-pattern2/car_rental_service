@@ -3,9 +3,9 @@ package main.command.concretecommand.user;
 import main.command.command.Command;
 import main.command.receiver.ApplicationContext;
 import domain.car.carFactory.CarType;
-import domain.payment.strategy.FeeStrategy;
-import domain.payment.strategy.PeakSeasonFeeStrategy;
-import domain.payment.strategy.OffSeasonFeeStrategy;
+import domain.rental.strategy.FeeStrategy;
+import domain.rental.strategy.PeakSeasonFeeStrategy;
+import domain.rental.strategy.OffSeasonFeeStrategy;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
