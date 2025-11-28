@@ -1,4 +1,4 @@
-package domain.payment.strategy;
+package domain.rental.strategy;
 
 import domain.car.Car;
 
@@ -16,3 +16,4 @@ public class BaseFeeStrategy implements FeeStrategy {
         return dailyFee.multiply(new BigDecimal(rentalDays));
     }
 }
+

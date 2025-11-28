@@ -2,10 +2,10 @@ package main.command.concretecommand.admin;
 
 import main.command.command.Command;
 import main.command.receiver.ApplicationContext;
-import domain.payment.strategy.BaseFeeStrategy;
-import domain.payment.strategy.FeeStrategy;
-import domain.payment.strategy.PeakSeasonFeeStrategy;
-import domain.payment.strategy.OffSeasonFeeStrategy;
+import domain.rental.strategy.BaseFeeStrategy;
+import domain.rental.strategy.FeeStrategy;
+import domain.rental.strategy.PeakSeasonFeeStrategy;
+import domain.rental.strategy.OffSeasonFeeStrategy;
 
 import java.util.Scanner;
 

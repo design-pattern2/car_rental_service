@@ -2,7 +2,6 @@ package main.command.receiver;
 
 import domain.admin.AdminService;
 import domain.car.CarRepository;
-import domain.payment.PaymentService;
 import domain.rental.RentalRepository;
 import domain.rental.RentalService;
 import domain.user.User;
@@ -22,23 +21,20 @@ public class ApplicationContext {
     private final CarRepository carRepository;
     private final RentalService rentalService;
     private final RentalRepository rentalRepository;
-    private final PaymentService paymentService;
     
     // 애플리케이션 상태
     private User loggedInUser = null;
     private boolean isAdmin = false;
     private final Map<Long, domain.rental.RentalRecord> rentalRecordCache = new HashMap<>();
-    private domain.payment.strategy.FeeStrategy currentSeason = new domain.payment.strategy.BaseFeeStrategy();
+    private domain.rental.strategy.FeeStrategy currentSeason = new domain.rental.strategy.BaseFeeStrategy();
     
     public ApplicationContext(UserService userService, AdminService adminService,
-                             CarRepository carRepository, RentalService rentalService,
-                             PaymentService paymentService) {
+                             CarRepository carRepository, RentalService rentalService) {
         this.userService = userService;
         this.adminService = adminService;
         this.carRepository = carRepository;
         this.rentalService = rentalService;
         this.rentalRepository = new RentalRepository(new DBConnection());
-        this.paymentService = paymentService;
     }
     
     // Getters
@@ -47,7 +43,6 @@ public class ApplicationContext {
     public CarRepository getCarRepository() { return carRepository; }
     public RentalService getRentalService() { return rentalService; }
     public RentalRepository getRentalRepository() { return rentalRepository; }
-    public PaymentService getPaymentService() { return paymentService; }
     
     public User getLoggedInUser() { return loggedInUser; }
     public void setLoggedInUser(User user) { 
@@ -66,8 +61,8 @@ public class ApplicationContext {
     
     public Map<Long, domain.rental.RentalRecord> getRentalRecordCache() { return rentalRecordCache; }
     
-    public domain.payment.strategy.FeeStrategy getCurrentSeason() { return currentSeason; }
-    public void setCurrentSeason(domain.payment.strategy.FeeStrategy season) { this.currentSeason = season; }
+    public domain.rental.strategy.FeeStrategy getCurrentSeason() { return currentSeason; }
+    public void setCurrentSeason(domain.rental.strategy.FeeStrategy season) { this.currentSeason = season; }
     
     /**
      * BigDecimal을 정수 문자열로 변환 (소수점 제거)

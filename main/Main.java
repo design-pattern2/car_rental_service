@@ -4,7 +4,6 @@ import db.DBConnection;
 import db.EnvLoader;
 import domain.admin.AdminService;
 import domain.car.CarRepository;
-import domain.payment.PaymentService;
 import domain.rental.RentalService;
 import domain.user.UserRepository;
 import domain.user.UserService;
@@ -41,11 +40,10 @@ public class Main {
             AdminService adminService = new AdminService(db, userService);
             CarRepository carRepository = new CarRepository(db);
             RentalService rentalService = new RentalService(new domain.rental.RentalRepository(db), userService);
-            PaymentService paymentService = new PaymentService(userService);
             
             // ApplicationContext 생성 (Receiver)
             ApplicationContext context = new ApplicationContext(
-                userService, adminService, carRepository, rentalService, paymentService
+                userService, adminService, carRepository, rentalService
             );
             
             System.out.println("✅ 시뮬레이션 시작 완료");

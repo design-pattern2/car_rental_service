@@ -2,7 +2,7 @@ package domain.rental.option;
 
 import domain.car.Car;
 import domain.car.decorator.CarPricer;
-import domain.payment.strategy.FeeStrategy;
+import domain.rental.strategy.FeeStrategy;
 
 import java.math.BigDecimal;
 

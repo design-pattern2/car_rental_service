@@ -7,7 +7,7 @@ import domain.car.decorator.BlackboxOption;
 import domain.car.decorator.CarPricer;
 import domain.car.decorator.NavigationOption;
 import domain.car.decorator.SunroofOption;
-import domain.payment.strategy.FeeStrategy;
+import domain.rental.strategy.FeeStrategy;
 import domain.rental.option.OptionPricerAdapter;
 import domain.rental.option.RentalComponent;
 import domain.user.User;
