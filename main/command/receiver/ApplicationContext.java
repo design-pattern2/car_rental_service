@@ -34,7 +34,7 @@ public class ApplicationContext {
         this.adminService = adminService;
         this.carRepository = carRepository;
         this.rentalService = rentalService;
-        this.rentalRepository = new RentalRepository(new DBConnection());
+        this.rentalRepository = new RentalRepository(DBConnection.getInstance());
     }
     
     // Getters
